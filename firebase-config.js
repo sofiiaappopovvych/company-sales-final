@@ -1,13 +1,19 @@
-// 1. Create a Firebase project.
-// 2. Enable Authentication -> Email/Password.
-// 3. Enable Firestore Database.
-// 4. Replace the placeholder values below with your Firebase web app config.
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
 
-export const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
-};
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCc_fFOwZUgKmhD1L7fVcm8lnDTcykX2hU",
+    authDomain: "ompany-sales-final.firebaseapp.com",
+    projectId: "ompany-sales-final",
+    storageBucket: "ompany-sales-final.firebasestorage.app",
+    messagingSenderId: "121480749634",
+    appId: "1:121480749634:web:a0a2d6c36c9bf6be4303db"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
