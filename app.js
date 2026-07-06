@@ -48,6 +48,15 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => `$${Number(value || 0).toLocaleString()}`;
+const PIPELINE_STATUSES = [
+  { value: "new_lead", label: "New Lead" },
+  { value: "contacted", label: "Contacted" },
+  { value: "interested", label: "Interested" },
+  { value: "follow_up", label: "Follow-up" },
+  { value: "proposal_sent", label: "Proposal Sent" },
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" }
+];
 
 const els = {
   authView: $("authView"),
@@ -241,14 +250,16 @@ function renderAll() {
 }
 
 function renderStats() {
-  const openLeads = state.leads.filter((lead) => !["booked", "lost"].includes(lead.status));
+  const normalizedLeads = state.leads.map(normalizeLead);
+  const openLeads = normalizedLeads.filter((lead) => !["won", "lost"].includes(lead.status));
   const dueFollowUps = state.followUps.filter((item) => item.status !== "done" && item.dueDate <= today());
   const reportsToday = state.reports.filter((report) => report.date === today());
 
-  $("statTotalLeads").textContent = state.leads.length;
+  $("statTotalLeads").textContent = normalizedLeads.length;
   $("statOpenLeads").textContent = openLeads.length;
   $("statDueFollowUps").textContent = dueFollowUps.length;
   $("statReportsToday").textContent = reportsToday.length;
+  renderPipelineFunnel(normalizedLeads);
 
   $("dashboardFollowUps").innerHTML = renderMiniList(
     state.followUps.filter((item) => item.status !== "done").slice(0, 5),
@@ -256,7 +267,7 @@ function renderStats() {
   );
   $("dashboardLeads").innerHTML = renderMiniList(
     state.leads.slice(0, 5),
-    (lead) => `${leadTitle(lead)} - ${labelValue(lead.status)} - ${labelValue(lead.category || "No category")}`
+    (lead) => `${leadTitle(lead)} - ${statusLabel(lead.status)} - ${labelValue(lead.category || "No category")}`
   );
 }
 
@@ -287,6 +298,7 @@ function renderLeads() {
 }
 
 function renderLeadCard(lead) {
+  const normalizedLead = normalizeLead(lead);
   const createdDate = formatDateTime(lead.createdAt) || lead.createdDate || "-";
   const updatedDate = formatDateTime(lead.updatedAt) || lead.updatedDate || "-";
 
@@ -296,7 +308,7 @@ function renderLeadCard(lead) {
         <div>
           <div class="record-title">${escapeHtml(leadTitle(lead))}</div>
           <div class="record-meta">
-            <span class="badge ${lead.status === "booked" ? "success" : lead.status === "lost" ? "danger" : ""}">${escapeHtml(lead.status)}</span>
+            <span class="badge ${normalizedLead.status === "won" ? "success" : normalizedLead.status === "lost" ? "danger" : ""}">${escapeHtml(statusLabel(normalizedLead.status))}</span>
             <span>${escapeHtml(labelValue(lead.category || "No category"))}</span>
             <span>${escapeHtml(labelValue(lead.source || "No source"))}</span>
             <span>${escapeHtml(lead.city || "No city")}</span>
@@ -334,7 +346,7 @@ async function saveLead(event) {
     city: $("leadCity").value.trim(),
     category: $("leadCategory").value,
     source: $("leadSource").value,
-    status: $("leadStatus").value,
+    status: normalizeStatus($("leadStatus").value),
     assignedManagerId,
     assignedManagerName,
     nextFollowUpDate: $("leadNextFollowUpDate").value,
@@ -370,7 +382,7 @@ function editLead(id) {
   $("leadCity").value = lead.city || "";
   $("leadCategory").value = lead.category || "other";
   $("leadSource").value = lead.source || "other";
-  $("leadStatus").value = lead.status || "new";
+  $("leadStatus").value = normalizeStatus(lead.status || "new_lead");
   $("leadAssignedManager").value = lead.ownerId || state.user.uid;
   $("leadNextFollowUpDate").value = lead.nextFollowUpDate || "";
   $("leadNotes").value = lead.notes || "";
@@ -448,6 +460,7 @@ function clearLeadFilters() {
 
 function getFilteredLeads() {
   return state.leads.filter((lead) => {
+    const normalizedLead = normalizeLead(lead);
     const haystack = [
       lead.companyName,
       lead.contactName,
@@ -457,14 +470,15 @@ function getFilteredLeads() {
       lead.city,
       lead.category,
       lead.source,
-      lead.status,
+      normalizedLead.status,
+      statusLabel(normalizedLead.status),
       lead.notes,
       lead.ownerName,
       lead.assignedManagerName
     ].join(" ").toLowerCase();
 
     if (state.leadFilters.search && !haystack.includes(state.leadFilters.search)) return false;
-    if (state.leadFilters.status && lead.status !== state.leadFilters.status) return false;
+    if (state.leadFilters.status && normalizedLead.status !== state.leadFilters.status) return false;
     if (state.leadFilters.source && lead.source !== state.leadFilters.source) return false;
     if (state.leadFilters.category && lead.category !== state.leadFilters.category) return false;
     if (state.leadFilters.manager && lead.ownerId !== state.leadFilters.manager) return false;
@@ -649,13 +663,13 @@ function renderOwnerDashboard() {
 
   $("ownerTeamCount").textContent = state.users.length;
   $("ownerLeadCount").textContent = state.leads.length;
-  $("ownerRevenue").textContent = state.leads.filter((lead) => lead.status === "booked").length;
+  $("ownerRevenue").textContent = state.leads.filter((lead) => normalizeStatus(lead.status) === "won").length;
   $("ownerOpenFollowUps").textContent = openFollowUps;
 
   $("ownerTeamList").innerHTML = state.users.map((user) => {
     const leads = state.leads.filter((lead) => lead.ownerId === user.uid);
     const reports = state.reports.filter((report) => report.ownerId === user.uid);
-    const bookedLeads = leads.filter((lead) => lead.status === "booked").length;
+    const wonLeads = leads.filter((lead) => normalizeStatus(lead.status) === "won").length;
     return `
       <article class="record-card">
         <div class="record-title">${escapeHtml(user.displayName || user.email)}</div>
@@ -663,7 +677,7 @@ function renderOwnerDashboard() {
           <span class="badge">${escapeHtml(user.role)}</span>
           <span>Leads: ${leads.length}</span>
           <span>Reports: ${reports.length}</span>
-          <span>Booked leads: ${bookedLeads}</span>
+          <span>Won leads: ${wonLeads}</span>
         </div>
       </article>
     `;
@@ -712,6 +726,48 @@ function labelValue(value) {
   return String(value || "")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeLead(lead) {
+  return { ...lead, status: normalizeStatus(lead.status) };
+}
+
+function normalizeStatus(status) {
+  const legacyMap = {
+    new: "new_lead",
+    proposal: "proposal_sent",
+    booked: "won"
+  };
+  return legacyMap[status] || status || "new_lead";
+}
+
+function statusLabel(status) {
+  const normalized = normalizeStatus(status);
+  return PIPELINE_STATUSES.find((item) => item.value === normalized)?.label || labelValue(normalized);
+}
+
+function renderPipelineFunnel(leads) {
+  const counts = PIPELINE_STATUSES.map((status) => ({
+    ...status,
+    count: leads.filter((lead) => normalizeStatus(lead.status) === status.value).length
+  }));
+  const maxCount = Math.max(1, ...counts.map((item) => item.count));
+
+  $("pipelineTotal").textContent = `${leads.length} ${leads.length === 1 ? "lead" : "leads"}`;
+  $("pipelineFunnel").innerHTML = counts.map((item, index) => {
+    const width = Math.max(18, Math.round((item.count / maxCount) * 100));
+    return `
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-top">
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${item.count}</strong>
+        </div>
+        <div class="pipeline-bar-track">
+          <div class="pipeline-bar pipeline-${index}" style="width: ${width}%"></div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function formatDateTime(value) {

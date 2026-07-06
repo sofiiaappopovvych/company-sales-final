@@ -52,7 +52,7 @@
       <section id="hubView" class="hidden">
         <header class="topbar">
           <div>
-            <p class="eyebrow">CRM v1.1</p>
+            <p class="eyebrow">CRM v1.2</p>
             <h1>Company Sales Hub</h1>
           </div>
           <div class="user-box">
@@ -97,6 +97,13 @@
                 <strong id="statReportsToday">0</strong>
               </article>
             </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Sales Pipeline</h3>
+                <span id="pipelineTotal" class="muted">0 leads</span>
+              </div>
+              <div id="pipelineFunnel" class="pipeline-funnel"></div>
+            </article>
             <div class="two-column">
               <article class="panel">
                 <h3>Next Follow-ups</h3>
@@ -167,11 +174,12 @@
               <label>
                 Status
                 <select id="leadStatus">
-                  <option value="new">New</option>
+                  <option value="new_lead">New Lead</option>
                   <option value="contacted">Contacted</option>
+                  <option value="interested">Interested</option>
                   <option value="follow_up">Follow-up</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="booked">Booked</option>
+                  <option value="proposal_sent">Proposal Sent</option>
+                  <option value="won">Won</option>
                   <option value="lost">Lost</option>
                 </select>
               </label>
@@ -201,11 +209,12 @@
                 Status
                 <select id="filterStatus">
                   <option value="">All statuses</option>
-                  <option value="new">New</option>
+                  <option value="new_lead">New Lead</option>
                   <option value="contacted">Contacted</option>
+                  <option value="interested">Interested</option>
                   <option value="follow_up">Follow-up</option>
-                  <option value="proposal">Proposal</option>
-                  <option value="booked">Booked</option>
+                  <option value="proposal_sent">Proposal Sent</option>
+                  <option value="won">Won</option>
                   <option value="lost">Lost</option>
                 </select>
               </label>
@@ -337,7 +346,7 @@
                 <input id="reportBookings" type="number" min="0" value="0" />
               </label>
               <label>
-                Revenue booked
+                Revenue won
                 <input id="reportRevenue" type="number" min="0" value="0" />
               </label>
               <label class="full">
@@ -376,7 +385,7 @@
                 <strong id="ownerLeadCount">0</strong>
               </article>
               <article class="stat-card">
-                <span>Booked Leads</span>
+                <span>Won Leads</span>
                 <strong id="ownerRevenue">0</strong>
               </article>
               <article class="stat-card">

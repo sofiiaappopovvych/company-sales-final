@@ -276,6 +276,82 @@ main {
   margin-bottom: 14px;
 }
 
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-heading h3 {
+  margin: 0;
+}
+
+.pipeline-funnel {
+  display: grid;
+  gap: 12px;
+}
+
+.pipeline-stage {
+  display: grid;
+  gap: 7px;
+}
+
+.pipeline-stage-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pipeline-stage-top strong {
+  color: var(--ink);
+}
+
+.pipeline-bar-track {
+  height: 15px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f7;
+}
+
+.pipeline-bar {
+  height: 100%;
+  min-width: 18px;
+  border-radius: inherit;
+}
+
+.pipeline-0 {
+  background: #60a5fa;
+}
+
+.pipeline-1 {
+  background: #38bdf8;
+}
+
+.pipeline-2 {
+  background: #2dd4bf;
+}
+
+.pipeline-3 {
+  background: #a78bfa;
+}
+
+.pipeline-4 {
+  background: #f59e0b;
+}
+
+.pipeline-5 {
+  background: #22c55e;
+}
+
+.pipeline-6 {
+  background: #ef4444;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

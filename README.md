@@ -1,4 +1,4 @@
-# Company Sales Hub CRM v1.1
+# Company Sales Hub CRM v1.2
 
 Simple internal web app for owner and sales managers.
 
@@ -7,6 +7,8 @@ Simple internal web app for owner and sales managers.
 - Firebase email/password login and registration
 - Roles: `owner` and `sales_manager`
 - CRM leads v1.1 with company/contact fields, assigned manager, dates, search, and filters
+- Sales pipeline statuses: New Lead, Contacted, Interested, Follow-up, Proposal Sent, Won, Lost
+- Visual sales funnel with counters for every status
 - Daily checklist
 - Follow-up tracker
 - Daily reports
@@ -42,6 +44,7 @@ Simple internal web app for owner and sales managers.
 - Filter by source
 - Filter by category
 - Filter by manager for owner
+- Visual funnel and status counters
 
 ## Files
 
