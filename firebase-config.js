@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyCc_fFQwZUqKmhD1L7fVcm81nDTcykX2hU",
+  apiKey: "AIzaSyCc_fFOwZUgKmhD1L7fVcm8lnDTcykX2hU",
   authDomain: "ompany-sales-final.firebaseapp.com",
   projectId: "ompany-sales-final",
   storageBucket: "ompany-sales-final.firebasestorage.app",
