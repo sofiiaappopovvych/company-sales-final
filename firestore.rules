@@ -29,30 +29,24 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
-    match /leads/{leadId} {
+    match /leads/{id} {
       allow create: if ownsIncoming();
-      allow read: if isOwner() || ownsExisting();
-      allow update: if isOwner() || ownsExisting();
-      allow delete: if isOwner() || ownsExisting();
+      allow read, update, delete: if isOwner() || ownsExisting();
     }
 
-    match /followUps/{followUpId} {
+    match /followUps/{id} {
       allow create: if ownsIncoming();
-      allow read: if isOwner() || ownsExisting();
-      allow update: if isOwner() || ownsExisting();
-      allow delete: if isOwner() || ownsExisting();
+      allow read, update, delete: if isOwner() || ownsExisting();
     }
 
-    match /dailyReports/{reportId} {
-      allow create, update: if ownsIncoming();
-      allow read: if isOwner() || ownsExisting();
-      allow delete: if isOwner() || ownsExisting();
+    match /dailyReports/{id} {
+      allow create: if ownsIncoming();
+      allow read, update, delete: if isOwner() || ownsExisting();
     }
 
-    match /dailyChecklists/{checklistId} {
-      allow create, update: if ownsIncoming();
-      allow read: if isOwner() || ownsExisting();
-      allow delete: if isOwner() || ownsExisting();
+    match /dailyChecklists/{id} {
+      allow create: if ownsIncoming();
+      allow read, update, delete: if isOwner() || ownsExisting();
     }
   }
 }
