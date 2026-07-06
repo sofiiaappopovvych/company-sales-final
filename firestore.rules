@@ -29,24 +29,30 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
-    match /leads/{id} {
-      allow create: if ownsIncoming();
-      allow read, update, delete: if isOwner() || ownsExisting();
+    match /leads/{leadId} {
+      allow create: if isOwner() || ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow update: if isOwner() || (ownsExisting() && ownsIncoming());
+      allow delete: if isOwner() || ownsExisting();
     }
 
-    match /followUps/{id} {
+    match /followUps/{followUpId} {
       allow create: if ownsIncoming();
-      allow read, update, delete: if isOwner() || ownsExisting();
+      allow read: if isOwner() || ownsExisting();
+      allow update: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
     }
 
-    match /dailyReports/{id} {
-      allow create: if ownsIncoming();
-      allow read, update, delete: if isOwner() || ownsExisting();
+    match /dailyReports/{reportId} {
+      allow create, update: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
     }
 
-    match /dailyChecklists/{id} {
-      allow create: if ownsIncoming();
-      allow read, update, delete: if isOwner() || ownsExisting();
+    match /dailyChecklists/{checklistId} {
+      allow create, update: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
     }
   }
 }

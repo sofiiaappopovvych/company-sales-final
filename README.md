@@ -1,4 +1,4 @@
-# Company Sales Hub MVP v1.0
+# Company Sales Hub CRM v1.1
 
 Simple internal web app for owner and sales managers.
 
@@ -6,7 +6,7 @@ Simple internal web app for owner and sales managers.
 
 - Firebase email/password login and registration
 - Roles: `owner` and `sales_manager`
-- CRM leads
+- CRM leads v1.1 with company/contact fields, assigned manager, dates, search, and filters
 - Daily checklist
 - Follow-up tracker
 - Daily reports
@@ -15,6 +15,33 @@ Simple internal web app for owner and sales managers.
 - Sales managers see their own data
 - Owner sees all team data
 - Works on GitHub Pages with plain HTML/CSS/JavaScript
+
+## Lead fields
+
+- Company name
+- Contact name
+- Phone
+- Email
+- City
+- Category
+- Source
+- Status
+- Assigned manager
+- Next follow-up date
+- Notes
+- Created date
+- Updated date
+
+## CRM functions
+
+- Add lead
+- Edit lead
+- Delete lead
+- Search leads
+- Filter by status
+- Filter by source
+- Filter by category
+- Filter by manager for owner
 
 ## Files
 

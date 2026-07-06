@@ -52,7 +52,7 @@
       <section id="hubView" class="hidden">
         <header class="topbar">
           <div>
-            <p class="eyebrow">MVP v1.0</p>
+            <p class="eyebrow">CRM v1.1</p>
             <h1>Company Sales Hub</h1>
           </div>
           <div class="user-box">
@@ -113,14 +113,18 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">CRM</p>
-                <h2>Leads</h2>
+                <h2>Leads CRM v1.1</h2>
               </div>
             </div>
             <form id="leadForm" class="form-grid panel">
               <input id="leadId" type="hidden" />
               <label>
-                Client name
-                <input id="leadName" type="text" required />
+                Company name
+                <input id="leadCompanyName" type="text" required />
+              </label>
+              <label>
+                Contact name
+                <input id="leadContactName" type="text" required />
               </label>
               <label>
                 Phone
@@ -131,20 +135,34 @@
                 <input id="leadEmail" type="email" />
               </label>
               <label>
-                Event type
-                <input id="leadEventType" type="text" placeholder="Birthday, corporate, grand opening..." />
+                City
+                <input id="leadCity" type="text" placeholder="Sacramento, Roseville..." />
               </label>
               <label>
-                Event date
-                <input id="leadEventDate" type="date" />
-              </label>
-              <label>
-                Value
-                <input id="leadValue" type="number" min="0" step="1" placeholder="0" />
+                Category
+                <select id="leadCategory">
+                  <option value="kids_events">Kids events</option>
+                  <option value="grand_opening">Grand opening</option>
+                  <option value="corporate">Corporate</option>
+                  <option value="school">School</option>
+                  <option value="church">Church</option>
+                  <option value="daycare">Daycare</option>
+                  <option value="museum">Museum</option>
+                  <option value="other">Other</option>
+                </select>
               </label>
               <label>
                 Source
-                <input id="leadSource" type="text" placeholder="Facebook, referral, Instagram..." />
+                <select id="leadSource">
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="referral">Referral</option>
+                  <option value="website">Website</option>
+                  <option value="cold_outreach">Cold outreach</option>
+                  <option value="partner">Partner</option>
+                  <option value="other">Other</option>
+                </select>
               </label>
               <label>
                 Status
@@ -157,6 +175,14 @@
                   <option value="lost">Lost</option>
                 </select>
               </label>
+              <label>
+                Assigned manager
+                <select id="leadAssignedManager"></select>
+              </label>
+              <label>
+                Next follow-up date
+                <input id="leadNextFollowUpDate" type="date" />
+              </label>
               <label class="full">
                 Notes
                 <textarea id="leadNotes" rows="3"></textarea>
@@ -166,6 +192,57 @@
                 <button id="clearLeadBtn" class="secondary" type="button">Clear</button>
               </div>
             </form>
+            <article class="panel lead-filters">
+              <label class="search-field">
+                Search
+                <input id="leadSearch" type="search" placeholder="Search company, contact, city, phone, email, notes..." />
+              </label>
+              <label>
+                Status
+                <select id="filterStatus">
+                  <option value="">All statuses</option>
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="follow_up">Follow-up</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="booked">Booked</option>
+                  <option value="lost">Lost</option>
+                </select>
+              </label>
+              <label>
+                Source
+                <select id="filterSource">
+                  <option value="">All sources</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="referral">Referral</option>
+                  <option value="website">Website</option>
+                  <option value="cold_outreach">Cold outreach</option>
+                  <option value="partner">Partner</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <select id="filterCategory">
+                  <option value="">All categories</option>
+                  <option value="kids_events">Kids events</option>
+                  <option value="grand_opening">Grand opening</option>
+                  <option value="corporate">Corporate</option>
+                  <option value="school">School</option>
+                  <option value="church">Church</option>
+                  <option value="daycare">Daycare</option>
+                  <option value="museum">Museum</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label id="filterManagerWrap">
+                Manager
+                <select id="filterManager"></select>
+              </label>
+              <button id="clearLeadFiltersBtn" class="secondary" type="button">Clear filters</button>
+            </article>
             <div id="leadsList" class="records"></div>
           </section>
 
@@ -299,8 +376,8 @@
                 <strong id="ownerLeadCount">0</strong>
               </article>
               <article class="stat-card">
-                <span>Booked Revenue</span>
-                <strong id="ownerRevenue">$0</strong>
+                <span>Booked Leads</span>
+                <strong id="ownerRevenue">0</strong>
               </article>
               <article class="stat-card">
                 <span>Open Follow-ups</span>

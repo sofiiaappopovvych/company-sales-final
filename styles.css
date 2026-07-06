@@ -282,6 +282,17 @@ main {
   gap: 14px;
 }
 
+.lead-filters {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, minmax(130px, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.search-field {
+  min-width: 220px;
+}
+
 .full {
   grid-column: 1 / -1;
 }
@@ -396,6 +407,7 @@ main {
   .stats-grid,
   .two-column,
   .form-grid,
+  .lead-filters,
   .checklist {
     grid-template-columns: 1fr;
   }

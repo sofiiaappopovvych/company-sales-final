@@ -35,7 +35,14 @@ const state = {
   leads: [],
   followUps: [],
   reports: [],
-  checklist: {}
+  checklist: {},
+  leadFilters: {
+    search: "",
+    status: "",
+    source: "",
+    category: "",
+    manager: ""
+  }
 };
 
 const $ = (id) => document.getElementById(id);
@@ -77,6 +84,12 @@ function bindEvents() {
   els.refreshBtn.addEventListener("click", loadData);
   els.leadForm.addEventListener("submit", saveLead);
   $("clearLeadBtn").addEventListener("click", clearLeadForm);
+  $("leadSearch").addEventListener("input", updateLeadFilters);
+  $("filterStatus").addEventListener("change", updateLeadFilters);
+  $("filterSource").addEventListener("change", updateLeadFilters);
+  $("filterCategory").addEventListener("change", updateLeadFilters);
+  $("filterManager").addEventListener("change", updateLeadFilters);
+  $("clearLeadFiltersBtn").addEventListener("click", clearLeadFilters);
   els.followUpForm.addEventListener("submit", saveFollowUp);
   $("clearFollowUpBtn").addEventListener("click", clearFollowUpForm);
   els.reportForm.addEventListener("submit", saveReport);
@@ -243,7 +256,7 @@ function renderStats() {
   );
   $("dashboardLeads").innerHTML = renderMiniList(
     state.leads.slice(0, 5),
-    (lead) => `${lead.name} - ${lead.status} - ${lead.eventType || "No event type"}`
+    (lead) => `${leadTitle(lead)} - ${labelValue(lead.status)} - ${labelValue(lead.category || "No category")}`
   );
 }
 
@@ -253,13 +266,16 @@ function renderMiniList(items, mapper) {
 }
 
 function renderLeads() {
-  $("leadsList").innerHTML = state.leads.length
-    ? state.leads.map(renderLeadCard).join("")
-    : `<article class="record-card"><p class="muted">No leads yet. Add your first lead above.</p></article>`;
+  renderManagerOptions();
+  const filteredLeads = getFilteredLeads();
+
+  $("leadsList").innerHTML = filteredLeads.length
+    ? filteredLeads.map(renderLeadCard).join("")
+    : `<article class="record-card"><p class="muted">No leads match the current filters.</p></article>`;
 
   $("followUpLead").innerHTML = [
     `<option value="">No lead selected</option>`,
-    ...state.leads.map((lead) => `<option value="${lead.id}">${escapeHtml(lead.name)}</option>`)
+    ...state.leads.map((lead) => `<option value="${lead.id}">${escapeHtml(leadTitle(lead))}</option>`)
   ].join("");
 
   document.querySelectorAll("[data-edit-lead]").forEach((button) => {
@@ -271,17 +287,21 @@ function renderLeads() {
 }
 
 function renderLeadCard(lead) {
+  const createdDate = formatDateTime(lead.createdAt) || lead.createdDate || "-";
+  const updatedDate = formatDateTime(lead.updatedAt) || lead.updatedDate || "-";
+
   return `
     <article class="record-card">
       <div class="record-header">
         <div>
-          <div class="record-title">${escapeHtml(lead.name)}</div>
+          <div class="record-title">${escapeHtml(leadTitle(lead))}</div>
           <div class="record-meta">
             <span class="badge ${lead.status === "booked" ? "success" : lead.status === "lost" ? "danger" : ""}">${escapeHtml(lead.status)}</span>
-            <span>${escapeHtml(lead.eventType || "No event type")}</span>
-            <span>${escapeHtml(lead.eventDate || "No event date")}</span>
-            <span>${money(lead.value)}</span>
-            ${isOwner() ? `<span>${escapeHtml(userName(lead.ownerId))}</span>` : ""}
+            <span>${escapeHtml(labelValue(lead.category || "No category"))}</span>
+            <span>${escapeHtml(labelValue(lead.source || "No source"))}</span>
+            <span>${escapeHtml(lead.city || "No city")}</span>
+            <span>Next: ${escapeHtml(lead.nextFollowUpDate || "No date")}</span>
+            <span>Manager: ${escapeHtml(userName(lead.ownerId))}</span>
           </div>
         </div>
         <div class="record-actions">
@@ -291,9 +311,11 @@ function renderLeadCard(lead) {
       </div>
       <p class="muted">${escapeHtml(lead.notes || "No notes")}</p>
       <div class="record-meta">
+        <span>Contact: ${escapeHtml(lead.contactName || lead.name || "No contact")}</span>
         <span>${escapeHtml(lead.phone || "No phone")}</span>
         <span>${escapeHtml(lead.email || "No email")}</span>
-        <span>${escapeHtml(lead.source || "No source")}</span>
+        <span>Created: ${escapeHtml(createdDate)}</span>
+        <span>Updated: ${escapeHtml(updatedDate)}</span>
       </div>
     </article>
   `;
@@ -302,25 +324,35 @@ function renderLeadCard(lead) {
 async function saveLead(event) {
   event.preventDefault();
   const id = $("leadId").value;
+  const assignedManagerId = isOwner() ? $("leadAssignedManager").value : state.user.uid;
+  const assignedManagerName = userName(assignedManagerId);
   const payload = {
-    name: $("leadName").value.trim(),
+    companyName: $("leadCompanyName").value.trim(),
+    contactName: $("leadContactName").value.trim(),
     phone: $("leadPhone").value.trim(),
     email: $("leadEmail").value.trim(),
-    eventType: $("leadEventType").value.trim(),
-    eventDate: $("leadEventDate").value,
-    value: Number($("leadValue").value || 0),
-    source: $("leadSource").value.trim(),
+    city: $("leadCity").value.trim(),
+    category: $("leadCategory").value,
+    source: $("leadSource").value,
     status: $("leadStatus").value,
+    assignedManagerId,
+    assignedManagerName,
+    nextFollowUpDate: $("leadNextFollowUpDate").value,
     notes: $("leadNotes").value.trim(),
-    ownerId: state.user.uid,
-    ownerName: state.profile.displayName || state.user.email,
+    ownerId: assignedManagerId,
+    ownerName: assignedManagerName,
+    updatedDate: today(),
     updatedAt: serverTimestamp()
   };
 
   if (id) {
     await updateDoc(doc(db, "leads", id), payload);
   } else {
-    await addDoc(collection(db, "leads"), { ...payload, createdAt: serverTimestamp() });
+    await addDoc(collection(db, "leads"), {
+      ...payload,
+      createdDate: today(),
+      createdAt: serverTimestamp()
+    });
   }
 
   clearLeadForm();
@@ -331,14 +363,16 @@ function editLead(id) {
   const lead = state.leads.find((item) => item.id === id);
   if (!lead) return;
   $("leadId").value = lead.id;
-  $("leadName").value = lead.name || "";
+  $("leadCompanyName").value = lead.companyName || lead.name || "";
+  $("leadContactName").value = lead.contactName || lead.name || "";
   $("leadPhone").value = lead.phone || "";
   $("leadEmail").value = lead.email || "";
-  $("leadEventType").value = lead.eventType || "";
-  $("leadEventDate").value = lead.eventDate || "";
-  $("leadValue").value = lead.value || "";
-  $("leadSource").value = lead.source || "";
+  $("leadCity").value = lead.city || "";
+  $("leadCategory").value = lead.category || "other";
+  $("leadSource").value = lead.source || "other";
   $("leadStatus").value = lead.status || "new";
+  $("leadAssignedManager").value = lead.ownerId || state.user.uid;
+  $("leadNextFollowUpDate").value = lead.nextFollowUpDate || "";
   $("leadNotes").value = lead.notes || "";
   showSection("leadsSection");
 }
@@ -352,6 +386,90 @@ async function deleteLead(id) {
 function clearLeadForm() {
   els.leadForm.reset();
   $("leadId").value = "";
+  renderManagerOptions();
+}
+
+function renderManagerOptions() {
+  const managerOptions = getManagerOptions();
+  $("leadAssignedManager").innerHTML = managerOptions
+    .map((user) => `<option value="${user.uid}">${escapeHtml(user.displayName || user.email)}</option>`)
+    .join("");
+  $("leadAssignedManager").disabled = !isOwner();
+  $("filterManagerWrap").classList.toggle("hidden", !isOwner());
+  $("filterManager").innerHTML = [
+    `<option value="">All managers</option>`,
+    ...managerOptions.map((user) => `<option value="${user.uid}">${escapeHtml(user.displayName || user.email)}</option>`)
+  ].join("");
+  $("filterManager").value = state.leadFilters.manager;
+  if (!isOwner()) {
+    $("leadAssignedManager").value = state.user.uid;
+    state.leadFilters.manager = "";
+  }
+}
+
+function getManagerOptions() {
+  if (!isOwner()) {
+    return [{
+      uid: state.user.uid,
+      email: state.user.email,
+      displayName: state.profile?.displayName || state.user.email
+    }];
+  }
+
+  const managers = state.users.filter((user) => ["owner", "sales_manager"].includes(user.role));
+  const hasCurrentUser = managers.some((user) => user.uid === state.user.uid);
+  return hasCurrentUser ? managers : [{
+    uid: state.user.uid,
+    email: state.user.email,
+    displayName: state.profile?.displayName || state.user.email,
+    role: state.profile?.role || "owner"
+  }, ...managers];
+}
+
+function updateLeadFilters() {
+  state.leadFilters = {
+    search: $("leadSearch").value.trim().toLowerCase(),
+    status: $("filterStatus").value,
+    source: $("filterSource").value,
+    category: $("filterCategory").value,
+    manager: $("filterManager").value
+  };
+  renderLeads();
+}
+
+function clearLeadFilters() {
+  $("leadSearch").value = "";
+  $("filterStatus").value = "";
+  $("filterSource").value = "";
+  $("filterCategory").value = "";
+  $("filterManager").value = "";
+  updateLeadFilters();
+}
+
+function getFilteredLeads() {
+  return state.leads.filter((lead) => {
+    const haystack = [
+      lead.companyName,
+      lead.contactName,
+      lead.name,
+      lead.phone,
+      lead.email,
+      lead.city,
+      lead.category,
+      lead.source,
+      lead.status,
+      lead.notes,
+      lead.ownerName,
+      lead.assignedManagerName
+    ].join(" ").toLowerCase();
+
+    if (state.leadFilters.search && !haystack.includes(state.leadFilters.search)) return false;
+    if (state.leadFilters.status && lead.status !== state.leadFilters.status) return false;
+    if (state.leadFilters.source && lead.source !== state.leadFilters.source) return false;
+    if (state.leadFilters.category && lead.category !== state.leadFilters.category) return false;
+    if (state.leadFilters.manager && lead.ownerId !== state.leadFilters.manager) return false;
+    return true;
+  });
 }
 
 function renderFollowUps() {
@@ -527,20 +645,17 @@ function renderReportCard(report) {
 function renderOwnerDashboard() {
   if (!isOwner()) return;
 
-  const bookedRevenue = state.leads
-    .filter((lead) => lead.status === "booked")
-    .reduce((sum, lead) => sum + Number(lead.value || 0), 0);
   const openFollowUps = state.followUps.filter((item) => item.status !== "done").length;
 
   $("ownerTeamCount").textContent = state.users.length;
   $("ownerLeadCount").textContent = state.leads.length;
-  $("ownerRevenue").textContent = money(bookedRevenue);
+  $("ownerRevenue").textContent = state.leads.filter((lead) => lead.status === "booked").length;
   $("ownerOpenFollowUps").textContent = openFollowUps;
 
   $("ownerTeamList").innerHTML = state.users.map((user) => {
     const leads = state.leads.filter((lead) => lead.ownerId === user.uid);
     const reports = state.reports.filter((report) => report.ownerId === user.uid);
-    const revenue = leads.filter((lead) => lead.status === "booked").reduce((sum, lead) => sum + Number(lead.value || 0), 0);
+    const bookedLeads = leads.filter((lead) => lead.status === "booked").length;
     return `
       <article class="record-card">
         <div class="record-title">${escapeHtml(user.displayName || user.email)}</div>
@@ -548,7 +663,7 @@ function renderOwnerDashboard() {
           <span class="badge">${escapeHtml(user.role)}</span>
           <span>Leads: ${leads.length}</span>
           <span>Reports: ${reports.length}</span>
-          <span>Booked: ${money(revenue)}</span>
+          <span>Booked leads: ${bookedLeads}</span>
         </div>
       </article>
     `;
@@ -573,7 +688,7 @@ function userName(uid) {
 function leadName(leadId) {
   if (!leadId) return "No lead selected";
   const found = state.leads.find((lead) => lead.id === leadId);
-  return found?.name || "Deleted lead";
+  return found ? leadTitle(found) : "Deleted lead";
 }
 
 function labelRole(role) {
@@ -587,6 +702,23 @@ function setMessage(element, text, isError = false) {
 
 function cleanError(error) {
   return error?.message?.replace("Firebase: ", "") || "Something went wrong.";
+}
+
+function leadTitle(lead) {
+  return lead.companyName || lead.name || lead.contactName || "Untitled lead";
+}
+
+function labelValue(value) {
+  return String(value || "")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = value.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString();
 }
 
 function escapeHtml(value) {
