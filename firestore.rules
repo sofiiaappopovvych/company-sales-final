@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return signedIn() && userProfile().role == "owner";
+    }
+
+    function ownsExisting() {
+      return signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function ownsIncoming() {
+      return signedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && userId == request.auth.uid;
+      allow read: if signedIn() && (userId == request.auth.uid || isOwner());
+      allow update: if signedIn() && (userId == request.auth.uid || isOwner());
+      allow delete: if isOwner();
+    }
+
+    match /leads/{leadId} {
+      allow create: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow update: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
+    }
+
+    match /followUps/{followUpId} {
+      allow create: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow update: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
+    }
+
+    match /dailyReports/{reportId} {
+      allow create, update: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
+    }
+
+    match /dailyChecklists/{checklistId} {
+      allow create, update: if ownsIncoming();
+      allow read: if isOwner() || ownsExisting();
+      allow delete: if isOwner() || ownsExisting();
+    }
+  }
+}

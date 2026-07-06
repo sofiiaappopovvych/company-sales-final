@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Company Sales Hub MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <section id="authView" class="auth-shell">
+        <div class="auth-card">
+          <p class="eyebrow">Internal Sales Tool</p>
+          <h1>Company Sales Hub</h1>
+          <p class="muted">Login or create an account for your sales team.</p>
+
+          <div class="tabs" role="tablist" aria-label="Authentication mode">
+            <button id="loginTab" class="tab active" type="button">Login</button>
+            <button id="registerTab" class="tab" type="button">Register</button>
+          </div>
+
+          <form id="authForm" class="stack">
+            <label>
+              Email
+              <input id="authEmail" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required />
+            </label>
+            <label id="displayNameField" class="hidden">
+              Full name
+              <input id="displayName" type="text" autocomplete="name" />
+            </label>
+            <label id="roleField" class="hidden">
+              Role
+              <select id="requestedRole">
+                <option value="sales_manager">Sales manager</option>
+                <option value="owner">Owner</option>
+              </select>
+            </label>
+            <button id="authSubmit" class="primary" type="submit">Login</button>
+          </form>
+
+          <p id="authMessage" class="message" role="status"></p>
+          <div class="setup-note">
+            <strong>First setup:</strong> paste your Firebase keys into <code>firebase-config.js</code>.
+          </div>
+        </div>
+      </section>
+
+      <section id="hubView" class="hidden">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">MVP v1.0</p>
+            <h1>Company Sales Hub</h1>
+          </div>
+          <div class="user-box">
+            <span id="userSummary">Loading...</span>
+            <button id="logoutBtn" class="ghost" type="button">Logout</button>
+          </div>
+        </header>
+
+        <nav class="main-nav" aria-label="Main sections">
+          <button class="nav-btn active" data-section="dashboardSection" type="button">Dashboard</button>
+          <button class="nav-btn" data-section="leadsSection" type="button">CRM Leads</button>
+          <button class="nav-btn" data-section="checklistSection" type="button">Daily Checklist</button>
+          <button class="nav-btn" data-section="followUpsSection" type="button">Follow-up</button>
+          <button class="nav-btn" data-section="reportsSection" type="button">Daily Reports</button>
+          <button id="ownerNavBtn" class="nav-btn hidden" data-section="ownerSection" type="button">Owner Dashboard</button>
+        </nav>
+
+        <main>
+          <section id="dashboardSection" class="page-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Today</p>
+                <h2>Workspace Overview</h2>
+              </div>
+              <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+            </div>
+            <div class="stats-grid">
+              <article class="stat-card">
+                <span>Total Leads</span>
+                <strong id="statTotalLeads">0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Open Leads</span>
+                <strong id="statOpenLeads">0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Follow-ups Due</span>
+                <strong id="statDueFollowUps">0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Reports Today</span>
+                <strong id="statReportsToday">0</strong>
+              </article>
+            </div>
+            <div class="two-column">
+              <article class="panel">
+                <h3>Next Follow-ups</h3>
+                <div id="dashboardFollowUps" class="list"></div>
+              </article>
+              <article class="panel">
+                <h3>Recent Leads</h3>
+                <div id="dashboardLeads" class="list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section id="leadsSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">CRM</p>
+                <h2>Leads</h2>
+              </div>
+            </div>
+            <form id="leadForm" class="form-grid panel">
+              <input id="leadId" type="hidden" />
+              <label>
+                Client name
+                <input id="leadName" type="text" required />
+              </label>
+              <label>
+                Phone
+                <input id="leadPhone" type="tel" />
+              </label>
+              <label>
+                Email
+                <input id="leadEmail" type="email" />
+              </label>
+              <label>
+                Event type
+                <input id="leadEventType" type="text" placeholder="Birthday, corporate, grand opening..." />
+              </label>
+              <label>
+                Event date
+                <input id="leadEventDate" type="date" />
+              </label>
+              <label>
+                Value
+                <input id="leadValue" type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label>
+                Source
+                <input id="leadSource" type="text" placeholder="Facebook, referral, Instagram..." />
+              </label>
+              <label>
+                Status
+                <select id="leadStatus">
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="follow_up">Follow-up</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="booked">Booked</option>
+                  <option value="lost">Lost</option>
+                </select>
+              </label>
+              <label class="full">
+                Notes
+                <textarea id="leadNotes" rows="3"></textarea>
+              </label>
+              <div class="form-actions full">
+                <button class="primary" type="submit">Save lead</button>
+                <button id="clearLeadBtn" class="secondary" type="button">Clear</button>
+              </div>
+            </form>
+            <div id="leadsList" class="records"></div>
+          </section>
+
+          <section id="checklistSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Daily work</p>
+                <h2>Daily Checklist</h2>
+              </div>
+              <button id="saveChecklistBtn" class="primary" type="button">Save checklist</button>
+            </div>
+            <article class="panel checklist">
+              <label><input type="checkbox" data-check-key="reviewNewLeads" /> Review new leads</label>
+              <label><input type="checkbox" data-check-key="contactHotLeads" /> Contact hot leads</label>
+              <label><input type="checkbox" data-check-key="sendFollowUps" /> Send follow-ups</label>
+              <label><input type="checkbox" data-check-key="postInGroups" /> Post or reply in Facebook groups</label>
+              <label><input type="checkbox" data-check-key="instagramOutreach" /> Instagram outreach</label>
+              <label><input type="checkbox" data-check-key="partnerOutreach" /> Partner outreach</label>
+              <label><input type="checkbox" data-check-key="updateCrm" /> Update CRM notes and statuses</label>
+              <label><input type="checkbox" data-check-key="submitReport" /> Submit daily report</label>
+            </article>
+            <p id="checklistMessage" class="message"></p>
+          </section>
+
+          <section id="followUpsSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Pipeline</p>
+                <h2>Follow-ups</h2>
+              </div>
+            </div>
+            <form id="followUpForm" class="form-grid panel">
+              <input id="followUpId" type="hidden" />
+              <label>
+                Related lead
+                <select id="followUpLead"></select>
+              </label>
+              <label>
+                Due date
+                <input id="followUpDate" type="date" required />
+              </label>
+              <label>
+                Type
+                <select id="followUpType">
+                  <option value="call">Call</option>
+                  <option value="text">Text</option>
+                  <option value="email">Email</option>
+                  <option value="social">Social media</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select id="followUpStatus">
+                  <option value="open">Open</option>
+                  <option value="done">Done</option>
+                </select>
+              </label>
+              <label class="full">
+                Notes
+                <textarea id="followUpNotes" rows="3" required></textarea>
+              </label>
+              <div class="form-actions full">
+                <button class="primary" type="submit">Save follow-up</button>
+                <button id="clearFollowUpBtn" class="secondary" type="button">Clear</button>
+              </div>
+            </form>
+            <div id="followUpsList" class="records"></div>
+          </section>
+
+          <section id="reportsSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">End of day</p>
+                <h2>Daily Reports</h2>
+              </div>
+            </div>
+            <form id="reportForm" class="form-grid panel">
+              <label>
+                Date
+                <input id="reportDate" type="date" required />
+              </label>
+              <label>
+                New leads
+                <input id="reportNewLeads" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Calls/messages
+                <input id="reportTouches" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Bookings
+                <input id="reportBookings" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Revenue booked
+                <input id="reportRevenue" type="number" min="0" value="0" />
+              </label>
+              <label class="full">
+                Wins
+                <textarea id="reportWins" rows="2"></textarea>
+              </label>
+              <label class="full">
+                Problems / blockers
+                <textarea id="reportBlockers" rows="2"></textarea>
+              </label>
+              <label class="full">
+                Tomorrow plan
+                <textarea id="reportTomorrow" rows="2"></textarea>
+              </label>
+              <div class="form-actions full">
+                <button class="primary" type="submit">Submit report</button>
+              </div>
+            </form>
+            <div id="reportsList" class="records"></div>
+          </section>
+
+          <section id="ownerSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Owner only</p>
+                <h2>Owner Dashboard</h2>
+              </div>
+            </div>
+            <div class="stats-grid">
+              <article class="stat-card">
+                <span>Team Members</span>
+                <strong id="ownerTeamCount">0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Team Leads</span>
+                <strong id="ownerLeadCount">0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Booked Revenue</span>
+                <strong id="ownerRevenue">$0</strong>
+              </article>
+              <article class="stat-card">
+                <span>Open Follow-ups</span>
+                <strong id="ownerOpenFollowUps">0</strong>
+              </article>
+            </div>
+            <article class="panel">
+              <h3>Team Activity</h3>
+              <div id="ownerTeamList" class="records compact"></div>
+            </article>
+          </section>
+        </main>
+      </section>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
