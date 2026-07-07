@@ -13,6 +13,7 @@ service cloud.firestore {
     function ownerEmails() {
       return [
         "skillfulsweing@gmail.com"
+        "sales@funandjoy.io"
       ];
     }
 
@@ -20,6 +21,7 @@ service cloud.firestore {
       return [
         "skillfulsweing@gmail.com"
         "snek.sova@gmail.com"
+        "sales@funandjoy.io"
       ];
     }
 
