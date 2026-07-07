@@ -12,15 +12,15 @@ service cloud.firestore {
 
     function ownerEmails() {
       return [
-        "skillfulsweing@gmail.com"
+        "skillfulsweing@gmail.com",
         "sales@funandjoy.io"
       ];
     }
 
     function approvedUserEmails() {
       return [
-        "skillfulsweing@gmail.com"
-        "snek.sova@gmail.com"
+        "skillfulsweing@gmail.com",
+        "snek.sova@gmail.com",
         "sales@funandjoy.io"
       ];
     }
