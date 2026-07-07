@@ -10,22 +10,49 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function ownerEmails() {
+      return [
+        "skillfulsweing@gmail.com"
+      ];
+    }
+
+    function approvedUserEmails() {
+      return [
+        "skillfulsweing@gmail.com"
+      ];
+    }
+
+    function approvedEmail() {
+      return signedIn() && request.auth.token.email in approvedUserEmails();
+    }
+
+    function isActive() {
+      return approvedEmail() && userProfile().disabled != true;
+    }
+
     function isOwner() {
-      return signedIn() && userProfile().role == "owner";
+      return isActive() && userProfile().role == "owner" && request.auth.token.email in ownerEmails();
     }
 
     function ownsExisting() {
-      return signedIn() && resource.data.ownerId == request.auth.uid;
+      return isActive() && resource.data.ownerId == request.auth.uid;
     }
 
     function ownsIncoming() {
-      return signedIn() && request.resource.data.ownerId == request.auth.uid;
+      return isActive() && request.resource.data.ownerId == request.auth.uid;
     }
 
     match /users/{userId} {
-      allow create: if signedIn() && userId == request.auth.uid;
-      allow read: if signedIn() && (userId == request.auth.uid || isOwner());
-      allow update: if signedIn() && (userId == request.auth.uid || isOwner());
+      allow create: if approvedEmail()
+        && userId == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.disabled == false
+        && (
+          (request.auth.token.email in ownerEmails() && request.resource.data.role == "owner")
+          || (!(request.auth.token.email in ownerEmails()) && request.resource.data.role == "sales_manager")
+        );
+      allow read: if approvedEmail() && (userId == request.auth.uid || isOwner());
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
 
@@ -37,20 +64,22 @@ service cloud.firestore {
     }
 
     match /followUps/{followUpId} {
-      allow create: if ownsIncoming();
+      allow create: if isOwner() || ownsIncoming();
       allow read: if isOwner() || ownsExisting();
-      allow update: if isOwner() || ownsExisting();
+      allow update: if isOwner() || (ownsExisting() && ownsIncoming());
       allow delete: if isOwner() || ownsExisting();
     }
 
     match /dailyReports/{reportId} {
-      allow create, update: if ownsIncoming();
+      allow create: if isOwner() || ownsIncoming();
+      allow update: if isOwner() || (ownsExisting() && ownsIncoming());
       allow read: if isOwner() || ownsExisting();
       allow delete: if isOwner() || ownsExisting();
     }
 
     match /dailyChecklists/{checklistId} {
-      allow create, update: if ownsIncoming();
+      allow create: if isOwner() || ownsIncoming();
+      allow update: if isOwner() || (ownsExisting() && ownsIncoming());
       allow read: if isOwner() || ownsExisting();
       allow delete: if isOwner() || ownsExisting();
     }

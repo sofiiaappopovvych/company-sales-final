@@ -32,19 +32,12 @@
               Full name
               <input id="displayName" type="text" autocomplete="name" />
             </label>
-            <label id="roleField" class="hidden">
-              Role
-              <select id="requestedRole">
-                <option value="sales_manager">Sales manager</option>
-                <option value="owner">Owner</option>
-              </select>
-            </label>
             <button id="authSubmit" class="primary" type="submit">Login</button>
           </form>
 
           <p id="authMessage" class="message" role="status"></p>
           <div class="setup-note">
-            <strong>First setup:</strong> paste your Firebase keys into <code>firebase-config.js</code>.
+            <strong>Private app:</strong> only approved company emails can login.
           </div>
         </div>
       </section>
@@ -52,7 +45,7 @@
       <section id="hubView" class="hidden">
         <header class="topbar">
           <div>
-            <p class="eyebrow">CRM v1.2</p>
+            <p class="eyebrow">CRM v2.0</p>
             <h1>Company Sales Hub</h1>
           </div>
           <div class="user-box">
@@ -63,10 +56,14 @@
 
         <nav class="main-nav" aria-label="Main sections">
           <button class="nav-btn active" data-section="dashboardSection" type="button">Dashboard</button>
+          <button class="nav-btn" data-section="kpiSection" type="button">KPI Dashboard</button>
           <button class="nav-btn" data-section="leadsSection" type="button">CRM Leads</button>
           <button class="nav-btn" data-section="checklistSection" type="button">Daily Checklist</button>
           <button class="nav-btn" data-section="followUpsSection" type="button">Follow-up</button>
           <button class="nav-btn" data-section="reportsSection" type="button">Daily Reports</button>
+          <button class="nav-btn" data-section="playbookSection" type="button">Sales Playbook</button>
+          <button class="nav-btn" data-section="templatesSection" type="button">Templates</button>
+          <button id="adminNavBtn" class="nav-btn hidden" data-section="adminSection" type="button">Admin Panel</button>
           <button id="ownerNavBtn" class="nav-btn hidden" data-section="ownerSection" type="button">Owner Dashboard</button>
         </nav>
 
@@ -116,11 +113,51 @@
             </div>
           </section>
 
+          <section id="kpiSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Performance</p>
+                <h2>KPI Dashboard</h2>
+              </div>
+              <button id="refreshKpiBtn" class="secondary" type="button">Refresh</button>
+            </div>
+            <div class="kpi-period-grid">
+              <article class="panel">
+                <div class="panel-heading">
+                  <h3>Today</h3>
+                  <span id="kpiTodayLabel" class="muted"></span>
+                </div>
+                <div id="kpiTodayGrid" class="kpi-grid"></div>
+              </article>
+              <article class="panel">
+                <div class="panel-heading">
+                  <h3>This Week</h3>
+                  <span id="kpiWeekLabel" class="muted"></span>
+                </div>
+                <div id="kpiWeekGrid" class="kpi-grid"></div>
+              </article>
+              <article class="panel">
+                <div class="panel-heading">
+                  <h3>This Month</h3>
+                  <span id="kpiMonthLabel" class="muted"></span>
+                </div>
+                <div id="kpiMonthGrid" class="kpi-grid"></div>
+              </article>
+            </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Leaderboard Managers</h3>
+                <span id="kpiLeaderboardCount" class="muted">0 managers</span>
+              </div>
+              <div id="kpiLeaderboard" class="records compact"></div>
+            </article>
+          </section>
+
           <section id="leadsSection" class="page-section hidden">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">CRM</p>
-                <h2>Leads CRM v1.1</h2>
+                <h2>Leads CRM</h2>
               </div>
             </div>
             <form id="leadForm" class="form-grid panel">
@@ -263,15 +300,35 @@
               </div>
               <button id="saveChecklistBtn" class="primary" type="button">Save checklist</button>
             </div>
-            <article class="panel checklist">
-              <label><input type="checkbox" data-check-key="reviewNewLeads" /> Review new leads</label>
-              <label><input type="checkbox" data-check-key="contactHotLeads" /> Contact hot leads</label>
-              <label><input type="checkbox" data-check-key="sendFollowUps" /> Send follow-ups</label>
-              <label><input type="checkbox" data-check-key="postInGroups" /> Post or reply in Facebook groups</label>
-              <label><input type="checkbox" data-check-key="instagramOutreach" /> Instagram outreach</label>
-              <label><input type="checkbox" data-check-key="partnerOutreach" /> Partner outreach</label>
-              <label><input type="checkbox" data-check-key="updateCrm" /> Update CRM notes and statuses</label>
-              <label><input type="checkbox" data-check-key="submitReport" /> Submit daily report</label>
+            <article class="panel daily-goals">
+              <div class="panel-heading full">
+                <h3>Daily Sales Checklist</h3>
+                <span id="dailyGoalProgress" class="muted">0% complete</span>
+              </div>
+              <label>
+                20 new CRM contacts
+                <input type="number" min="0" step="1" data-goal-key="newCrmContacts" />
+              </label>
+              <label>
+                15-20 new outreaches
+                <input type="number" min="0" step="1" data-goal-key="newOutreaches" />
+              </label>
+              <label>
+                30 follow-ups
+                <input type="number" min="0" step="1" data-goal-key="followUps" />
+              </label>
+              <label>
+                20-30 Facebook groups reviewed
+                <input type="number" min="0" step="1" data-goal-key="facebookGroupsReviewed" />
+              </label>
+              <label>
+                10-15 relevant posts found
+                <input type="number" min="0" step="1" data-goal-key="relevantPostsFound" />
+              </label>
+              <label class="checkbox-goal">
+                <input type="checkbox" data-goal-key="dailyReportSubmitted" />
+                Daily report submitted
+              </label>
             </article>
             <p id="checklistMessage" class="message"></p>
           </section>
@@ -280,9 +337,16 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Pipeline</p>
-                <h2>Follow-ups</h2>
+                <h2>Follow-up Queue</h2>
               </div>
             </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Due Today or Overdue</h3>
+                <span id="followUpQueueCount" class="muted">0 leads</span>
+              </div>
+              <div id="followUpQueueList" class="records compact"></div>
+            </article>
             <form id="followUpForm" class="form-grid panel">
               <input id="followUpId" type="hidden" />
               <label>
@@ -334,28 +398,44 @@
                 <input id="reportDate" type="date" required />
               </label>
               <label>
-                New leads
+                New leads added
                 <input id="reportNewLeads" type="number" min="0" value="0" />
               </label>
               <label>
-                Calls/messages
-                <input id="reportTouches" type="number" min="0" value="0" />
+                New outreaches
+                <input id="reportNewOutreaches" type="number" min="0" value="0" />
               </label>
               <label>
-                Bookings
-                <input id="reportBookings" type="number" min="0" value="0" />
+                Follow-ups completed
+                <input id="reportFollowUpsCompleted" type="number" min="0" value="0" />
               </label>
               <label>
-                Revenue won
-                <input id="reportRevenue" type="number" min="0" value="0" />
+                Calls made
+                <input id="reportCallsMade" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Messages sent
+                <input id="reportMessagesSent" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Proposals sent
+                <input id="reportProposalsSent" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Responses received
+                <input id="reportResponsesReceived" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Meetings booked
+                <input id="reportMeetingsBooked" type="number" min="0" value="0" />
+              </label>
+              <label>
+                Deals closed
+                <input id="reportDealsClosed" type="number" min="0" value="0" />
               </label>
               <label class="full">
-                Wins
-                <textarea id="reportWins" rows="2"></textarea>
-              </label>
-              <label class="full">
-                Problems / blockers
-                <textarea id="reportBlockers" rows="2"></textarea>
+                Problems / objections
+                <textarea id="reportProblems" rows="3"></textarea>
               </label>
               <label class="full">
                 Tomorrow plan
@@ -366,6 +446,62 @@
               </div>
             </form>
             <div id="reportsList" class="records"></div>
+          </section>
+
+          <section id="playbookSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Knowledge base</p>
+                <h2>Sales Playbook</h2>
+              </div>
+            </div>
+            <article class="panel playbook-tools">
+              <label class="search-field">
+                Search playbook
+                <input id="playbookSearch" type="search" placeholder="Search scripts, objections, audiences, SOP..." />
+              </label>
+              <label>
+                Language
+                <select id="playbookLanguage">
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                </select>
+              </label>
+              <button id="clearPlaybookSearchBtn" class="secondary" type="button">Clear search</button>
+            </article>
+            <div id="playbookList" class="playbook-list"></div>
+          </section>
+
+          <section id="templatesSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Message library</p>
+                <h2>Templates</h2>
+              </div>
+            </div>
+            <article class="panel template-tools">
+              <label class="search-field">
+                Search templates
+                <input id="templateSearch" type="search" placeholder="Search by category, channel, wording..." />
+              </label>
+              <label>
+                Category
+                <select id="templateCategory">
+                  <option value="">All categories</option>
+                  <option value="Facebook group reply">Facebook group reply</option>
+                  <option value="Facebook DM">Facebook DM</option>
+                  <option value="Instagram DM">Instagram DM</option>
+                  <option value="Email">Email</option>
+                  <option value="SMS">SMS</option>
+                  <option value="Phone scripts">Phone scripts</option>
+                  <option value="Follow-up messages">Follow-up messages</option>
+                  <option value="Objection responses">Objection responses</option>
+                </select>
+              </label>
+              <button id="clearTemplateSearchBtn" class="secondary" type="button">Clear search</button>
+            </article>
+            <p id="templateCopyMessage" class="message"></p>
+            <div id="templatesList" class="templates-list"></div>
           </section>
 
           <section id="ownerSection" class="page-section hidden">
@@ -396,6 +532,57 @@
             <article class="panel">
               <h3>Team Activity</h3>
               <div id="ownerTeamList" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Today's Checklist Progress</h3>
+                <span id="ownerChecklistDate" class="muted"></span>
+              </div>
+              <div id="ownerChecklistProgress" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Manager Daily Reports</h3>
+                <span id="ownerReportsCount" class="muted">0 reports</span>
+              </div>
+              <div id="ownerReportsList" class="records compact"></div>
+            </article>
+          </section>
+
+          <section id="adminSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Owner only</p>
+                <h2>Admin Panel</h2>
+              </div>
+            </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Users & Roles</h3>
+                <span id="adminUsersCount" class="muted">0 users</span>
+              </div>
+              <div id="adminUsersList" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Manager KPI</h3>
+                <span class="muted">Leads, reports, follow-ups, won deals</span>
+              </div>
+              <div id="adminKpiList" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Assign Leads</h3>
+                <span id="adminLeadsCount" class="muted">0 leads</span>
+              </div>
+              <div id="adminAssignLeadsList" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>All Daily Reports</h3>
+                <span id="adminReportsCount" class="muted">0 reports</span>
+              </div>
+              <div id="adminReportsList" class="records compact"></div>
             </article>
           </section>
         </main>
