@@ -34,6 +34,8 @@ const state = {
   profile: null,
   users: [],
   leads: [],
+  calendarLeads: [],
+  bookingSlots: [],
   followUps: [],
   reports: [],
   checklist: {},
@@ -42,6 +44,12 @@ const state = {
   playbookSearch: "",
   templateSearch: "",
   templateCategory: "",
+  calendarDate: new Date(),
+  availabilityFilters: {
+    character: "",
+    date: "",
+    status: ""
+  },
   leadFilters: {
     search: "",
     status: "",
@@ -62,6 +70,40 @@ const PIPELINE_STATUSES = [
   { value: "proposal_sent", label: "Proposal Sent" },
   { value: "won", label: "Won" },
   { value: "lost", label: "Lost" }
+];
+const BOOKING_STATUSES = [
+  { value: "inquiry", label: "Inquiry" },
+  { value: "tentative", label: "Tentative" },
+  { value: "booked", label: "Booked" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" }
+];
+const PACKAGE_OPTIONS = [
+  { value: "birthday_option_1", label: "Option 1 - $200 - 30 minutes - 1 character" },
+  { value: "birthday_special_option", label: "Special Option - $350 - 45 minutes - bear drum show" },
+  { value: "birthday_option_2", label: "Option 2 - $550 - 60 minutes - host + character" },
+  { value: "birthday_option_3", label: "Option 3 - $700 - 90 minutes - silver show" },
+  { value: "festival_most_popular", label: "Festival/corporate - $2400 - up to 6 hours" },
+  { value: "custom", label: "Custom package" }
+];
+const CHARACTER_OPTIONS = [
+  { value: "giant_bear", label: "Giant bear" },
+  { value: "white_bear", label: "White bear" },
+  { value: "panda", label: "Panda" },
+  { value: "brown_bear", label: "Brown bear" },
+  { value: "mirror_tiger", label: "Mirror tiger" },
+  { value: "custom_character", label: "Other / custom" }
+];
+const ADD_ON_OPTIONS = [
+  { value: "additional_character", label: "Additional character - $150" },
+  { value: "extra_30_minutes", label: "Additional 30 minutes - $100" },
+  { value: "desserts_cake", label: "Desserts & cake - from $150" },
+  { value: "flower_bouquet", label: "Flower bouquet - from $90" },
+  { value: "decorations", label: "Decorations - from $750" },
+  { value: "helium_balloons", label: "Helium balloons - $120" },
+  { value: "bubble_machine", label: "Bubble machine - $40" },
+  { value: "face_painting", label: "Face painting - $150/hour" },
+  { value: "balloon_sticks", label: "Balloon sticks - $4 per child" }
 ];
 const DAILY_GOALS = [
   { key: "newCrmContacts", label: "New CRM contacts", target: 20, range: "20" },
@@ -376,6 +418,17 @@ function bindEvents() {
   els.logoutBtn.addEventListener("click", () => signOut(auth));
   els.refreshBtn.addEventListener("click", loadData);
   $("refreshKpiBtn").addEventListener("click", loadData);
+  $("calendarPrevBtn").addEventListener("click", () => changeCalendarMonth(-1));
+  $("calendarNextBtn").addEventListener("click", () => changeCalendarMonth(1));
+  $("calendarTodayBtn").addEventListener("click", goToCalendarToday);
+  $("availabilityCharacter").addEventListener("change", updateAvailabilityFilters);
+  $("availabilityDate").addEventListener("change", updateAvailabilityFilters);
+  $("availabilityStatus").addEventListener("change", updateAvailabilityFilters);
+  $("availabilityTodayBtn").addEventListener("click", resetAvailabilityDate);
+  ["leadEventDate", "leadEventTime", "leadEventEndTime", "leadEventDuration", "leadBookingStatus", "leadMainCharacter", "leadAdditionalCharacters"].forEach((id) => {
+    $(id).addEventListener("change", updateLeadConflictWarning);
+    $(id).addEventListener("input", updateLeadConflictWarning);
+  });
   els.leadForm.addEventListener("submit", saveLead);
   $("clearLeadBtn").addEventListener("click", clearLeadForm);
   $("leadSearch").addEventListener("input", updateLeadFilters);
@@ -405,6 +458,7 @@ function bindEvents() {
 
   $("reportDate").value = today();
   $("followUpDate").value = today();
+  $("availabilityDate").value = today();
 }
 
 function setAuthMode(mode) {
@@ -520,20 +574,25 @@ async function loadData() {
   try {
     await withLoading("Syncing latest data...", async () => {
       const scopeField = isOwner() ? null : where("ownerId", "==", state.user.uid);
-      const [users, leads, followUps, reports, teamChecklists] = await Promise.all([
+      const [users, leads, calendarLeads, bookingSlots, followUps, reports, teamChecklists] = await Promise.all([
         isOwner() ? getDocs(collection(db, "users")) : Promise.resolve({ docs: [] }),
         getDocs(buildScopedQuery("leads", scopeField)),
+        isOwner() ? getDocs(query(collection(db, "leads"))) : Promise.resolve({ docs: [] }),
+        getDocs(query(collection(db, "bookingSlots"))),
         getDocs(buildScopedQuery("followUps", scopeField)),
         getDocs(buildScopedQuery("dailyReports", scopeField)),
         isOwner() ? getDocs(query(collection(db, "dailyChecklists"), where("date", "==", today()))) : Promise.resolve({ docs: [] })
       ]);
 
       state.users = users.docs.map(toRecord);
-      state.leads = leads.docs.map(toRecord).sort(sortBy("createdAt", "desc"));
+      state.leads = leads.docs.map(toLeadRecord).sort(sortBy("createdAt", "desc"));
+      state.calendarLeads = isOwner() ? calendarLeads.docs.map(toLeadRecord) : state.leads;
+      state.bookingSlots = bookingSlots.docs.map(toRecord);
       state.followUps = followUps.docs.map(toRecord).sort(sortBy("dueDate", "asc"));
       state.reports = reports.docs.map(toRecord).sort(sortBy("date", "desc"));
       state.teamChecklists = teamChecklists.docs.map(toRecord);
 
+      if (isOwner()) await syncBookingSlots();
       await loadChecklist();
       renderAll();
     });
@@ -550,6 +609,70 @@ function buildScopedQuery(name, scopeField) {
 
 function toRecord(snap) {
   return { id: snap.id, ...snap.data() };
+}
+
+function toLeadRecord(snap) {
+  return normalizeLegacyBooking(toRecord(snap));
+}
+
+function normalizeLegacyBooking(lead) {
+  const normalized = { ...lead };
+  const notes = String(normalized.notes || "").toLowerCase();
+
+  if (!normalized.bookingStatus && normalizeStatus(normalized.status) === "won") {
+    normalized.bookingStatus = "booked";
+    normalized.bookingConfirmed = true;
+  }
+
+  if (!normalized.eventDate && normalized.nextFollowUpDate && normalized.bookingStatus === "booked") {
+    normalized.eventDate = normalized.nextFollowUpDate;
+  }
+
+  if (!normalized.eventTime) {
+    const timeMatch = notes.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
+    if (timeMatch) normalized.eventTime = toTimeInputValue(timeMatch[1], timeMatch[2], timeMatch[3]);
+  }
+
+  if (!normalized.eventDuration) {
+    const durationMatch = notes.match(/(\d+)\s*(minutes|min|hours|hour)/);
+    if (durationMatch) normalized.eventDuration = `${durationMatch[1]} ${durationMatch[2]}`;
+  }
+
+  if (!normalized.eventEndTime && normalized.eventTime && normalized.eventDuration) {
+    normalized.eventEndTime = addMinutesToTime(normalized.eventTime, parseDurationMinutes(normalized.eventDuration) || 60);
+  }
+
+  if (!normalized.packageOption && notes.includes("special option")) {
+    normalized.packageOption = "birthday_special_option";
+  }
+
+  if (!normalized.mainCharacter && !normalized.character && notes.includes("bear")) {
+    normalized.mainCharacter = "giant_bear";
+    normalized.character = "giant_bear";
+  }
+
+  if (!Array.isArray(normalized.additionalCharacters)) {
+    normalized.additionalCharacters = [];
+  }
+
+  return normalized;
+}
+
+function toTimeInputValue(hourValue, minuteValue, meridiem) {
+  let hours = Number(hourValue);
+  const minutes = Number(minuteValue || 0);
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function addMinutesToTime(timeValue, minutesToAdd) {
+  const start = timeToMinutes(timeValue);
+  if (start === null) return "";
+  const total = start + minutesToAdd;
+  const hours = Math.floor(total / 60) % 24;
+  const minutes = total % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function sortBy(field, direction = "asc") {
@@ -575,6 +698,8 @@ async function loadChecklist() {
 function renderAll() {
   renderStats();
   renderKpiDashboard();
+  renderCalendar();
+  renderAvailability();
   renderLeads();
   renderFollowUps();
   renderFollowUpQueue();
@@ -600,17 +725,452 @@ function renderStats() {
 
   $("dashboardFollowUps").innerHTML = renderMiniList(
     state.followUps.filter((item) => item.status !== "done").slice(0, 5),
-    (item) => `${leadName(item.leadId)} - ${item.type} - ${item.dueDate}`
+    (item) => `${leadName(item.leadId)} - ${item.type} - ${formatDisplayDate(item.dueDate)}`
   );
   $("dashboardLeads").innerHTML = renderMiniList(
     state.leads.slice(0, 5),
     (lead) => `${leadTitle(lead)} - ${statusLabel(lead.status)} - ${labelValue(lead.category || "No category")}`
   );
+  renderDashboardBookedEvents();
+}
+
+function renderDashboardBookedEvents() {
+  const bookings = getUpcomingBookedEvents(state.leads);
+  $("dashboardBookedCount").textContent = `${bookings.length} ${bookings.length === 1 ? "event" : "events"}`;
+  $("dashboardBookedEvents").innerHTML = bookings.length
+    ? bookings.slice(0, 8).map((lead) => renderUpcomingBookedEvent(lead)).join("")
+    : `<article class="record-card"><p class="muted">No upcoming booked events.</p></article>`;
+}
+
+function getUpcomingBookedEvents(leads) {
+  return leads
+    .filter((lead) => lead.bookingStatus === "booked")
+    .filter((lead) => lead.eventDate && lead.eventDate >= today())
+    .sort((first, second) => String(first.eventDate || "").localeCompare(String(second.eventDate || "")) || sortCalendarBookings(first, second));
+}
+
+function renderUpcomingBookedEvent(lead) {
+  return `
+    <article class="record-card">
+      <div class="record-title">${escapeHtml(leadTitle(lead))}</div>
+      <div class="record-meta">
+        <span class="badge booking-badge booked">Booked</span>
+        <span>${escapeHtml(formatDisplayDate(lead.eventDate) || "No date")}</span>
+        <span>${escapeHtml(formatCalendarTime(lead))}</span>
+        <span>${escapeHtml(characterLabel(lead.mainCharacter || lead.character || ""))}</span>
+        <span>${escapeHtml(lead.city || "No city")}</span>
+        <span>${escapeHtml(packageLabel(lead.packageOption || ""))}</span>
+        <span>Manager: ${escapeHtml(lead.ownerName || lead.assignedManagerName || userName(lead.ownerId))}</span>
+        <span>Deposit: ${escapeHtml(booleanLabel(lead.depositPaid))}</span>
+        <span>Balance: ${escapeHtml(formatMoneyField(lead.balanceDue))}</span>
+      </div>
+    </article>
+  `;
 }
 
 function renderMiniList(items, mapper) {
   if (!items.length) return `<p class="muted">Nothing yet.</p>`;
   return items.map((item) => `<div class="record-card">${escapeHtml(mapper(item))}</div>`).join("");
+}
+
+function changeCalendarMonth(offset) {
+  const nextDate = new Date(state.calendarDate);
+  nextDate.setDate(1);
+  nextDate.setMonth(nextDate.getMonth() + offset);
+  state.calendarDate = nextDate;
+  renderCalendar();
+}
+
+function goToCalendarToday() {
+  state.calendarDate = new Date();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  if (!$("bookingCalendar")) return;
+
+  const year = state.calendarDate.getFullYear();
+  const month = state.calendarDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startOffset = firstDay.getDay();
+  const totalCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+  const monthBookings = getCalendarBookings().filter((lead) => {
+    const eventDate = parseIsoDate(lead.eventDate);
+    return eventDate && eventDate.getFullYear() === year && eventDate.getMonth() === month;
+  });
+
+  $("calendarMonthLabel").textContent = firstDay.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  $("calendarCount").textContent = `${monthBookings.length} ${monthBookings.length === 1 ? "booking" : "bookings"}`;
+
+  const cells = [];
+  for (let index = 0; index < totalCells; index += 1) {
+    const dayNumber = index - startOffset + 1;
+    const cellDate = new Date(year, month, dayNumber);
+    const inMonth = dayNumber >= 1 && dayNumber <= lastDay.getDate();
+    const isoDate = inMonth ? formatLocalIsoDate(cellDate) : "";
+    const dayBookings = inMonth
+      ? monthBookings.filter((lead) => lead.eventDate === isoDate).sort(sortCalendarBookings)
+      : [];
+
+    cells.push(`
+      <article class="calendar-day ${inMonth ? "" : "muted-day"} ${isoDate === today() ? "today" : ""}">
+        <div class="calendar-day-number">${inMonth ? dayNumber : ""}</div>
+        <div class="calendar-events">
+          ${dayBookings.map(renderCalendarBooking).join("")}
+        </div>
+      </article>
+    `);
+  }
+
+  $("bookingCalendar").innerHTML = cells.join("");
+}
+
+function getCalendarBookings() {
+  return getBookingSources().filter((lead) => {
+    const bookingStatus = lead.bookingStatus || "";
+    return lead.eventDate && ["booked", "tentative", "completed"].includes(bookingStatus);
+  });
+}
+
+function getBookingSources() {
+  if (isOwner()) return state.calendarLeads;
+  const ownLeadIds = new Set(state.leads.map((lead) => lead.id));
+  const busySlots = state.bookingSlots
+    .filter((slot) => !ownLeadIds.has(slot.leadId || slot.id))
+    .map((slot) => ({ ...slot, id: slot.leadId || slot.id, limited: true }));
+  return [...state.leads, ...busySlots];
+}
+
+async function syncBookingSlots() {
+  const writes = state.calendarLeads.map((lead) => updateBookingSlot(lead.id, lead));
+  await Promise.all(writes);
+}
+
+async function updateBookingSlot(leadId, lead) {
+  if (!leadId) return;
+  const slotRef = doc(db, "bookingSlots", leadId);
+  const bookingStatus = lead.bookingStatus || "";
+  const shouldHaveSlot = lead.eventDate && ["booked", "tentative", "completed"].includes(bookingStatus);
+
+  if (!shouldHaveSlot) {
+    await deleteDoc(slotRef).catch(() => {});
+    return;
+  }
+
+  await setDoc(slotRef, {
+    leadId,
+    ownerId: lead.ownerId,
+    eventDate: lead.eventDate || "",
+    eventTime: lead.eventTime || "",
+    eventEndTime: lead.eventEndTime || "",
+    eventDuration: lead.eventDuration || "",
+    bookingStatus,
+    mainCharacter: lead.mainCharacter || lead.character || "",
+    additionalCharacters: Array.isArray(lead.additionalCharacters) ? lead.additionalCharacters : [],
+    character: lead.mainCharacter || lead.character || "",
+    updatedAt: serverTimestamp()
+  });
+}
+
+function renderCalendarBooking(lead) {
+  const isOwnLead = lead.ownerId === state.user?.uid;
+  const canSeeDetails = !lead.limited && (isOwner() || isOwnLead);
+  const bookingClass = lead.bookingStatus === "completed" ? "completed" : lead.bookingStatus === "tentative" ? "tentative" : "booked";
+  const timeRange = formatCalendarTime(lead);
+  const conflicts = findConflictingBookings(lead);
+  const visibleConflictNotice = conflicts.length
+    ? `
+      <div class="calendar-conflicts">
+        <strong>Conflict warning</strong>
+        ${conflicts.map((conflict) => `<span>${escapeHtml(formatConflictDetail(conflict))}</span>`).join("")}
+      </div>
+    `
+    : "";
+  const busyConflictNotice = conflicts.length ? `<span class="conflict-line">Conflict warning</span>` : "";
+
+  if (!canSeeDetails) {
+    return `
+      <div class="calendar-event busy ${conflicts.length ? "has-conflict" : ""}">
+        <strong>${escapeHtml(timeRange)}</strong>
+        <span>Busy</span>
+        ${busyConflictNotice}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="calendar-event ${bookingClass} ${conflicts.length ? "has-conflict" : ""}">
+      <strong>${escapeHtml(timeRange)} - ${escapeHtml(leadTitle(lead))}</strong>
+      <span>${escapeHtml(bookingStatusLabel(lead.bookingStatus))}</span>
+      <span>${escapeHtml(characterLabel(lead.mainCharacter || lead.character || ""))}</span>
+      <span>${escapeHtml(lead.city || "No city")} · ${escapeHtml(packageLabel(lead.packageOption || ""))}</span>
+      <span>Manager: ${escapeHtml(lead.ownerName || lead.assignedManagerName || userName(lead.ownerId))}</span>
+      ${visibleConflictNotice}
+    </div>
+  `;
+}
+
+function sortCalendarBookings(first, second) {
+  return (first.eventTime || "").localeCompare(second.eventTime || "") || leadTitle(first).localeCompare(leadTitle(second));
+}
+
+function formatCalendarTime(lead) {
+  if (lead.eventTime && lead.eventEndTime) return `${lead.eventTime}-${lead.eventEndTime}`;
+  if (lead.eventTime) return lead.eventTime;
+  if (lead.eventEndTime) return `Ends ${lead.eventEndTime}`;
+  return "Time TBD";
+}
+
+function updateAvailabilityFilters() {
+  state.availabilityFilters = {
+    character: $("availabilityCharacter").value,
+    date: $("availabilityDate").value || today(),
+    status: $("availabilityStatus").value
+  };
+  renderAvailability();
+}
+
+function resetAvailabilityDate() {
+  $("availabilityDate").value = today();
+  updateAvailabilityFilters();
+}
+
+function renderAvailability() {
+  if (!$("availabilityList")) return;
+
+  const filters = state.availabilityFilters;
+  const selectedDate = filters.date || today();
+  const characters = CHARACTER_OPTIONS.filter((character) => !filters.character || character.value === filters.character);
+  const rangeDates = getAvailabilityRange(selectedDate);
+  const allFilteredBookings = getAvailabilityBookings().filter((lead) => {
+    if (filters.status && lead.bookingStatus !== filters.status) return false;
+    return rangeDates.includes(lead.eventDate);
+  });
+
+  $("availabilityRangeLabel").textContent = `${formatReadableDate(rangeDates[0])} - ${formatReadableDate(rangeDates[rangeDates.length - 1])}`;
+  $("availabilityCount").textContent = `${allFilteredBookings.length} ${allFilteredBookings.length === 1 ? "booking" : "bookings"}`;
+  $("availabilitySummary").innerHTML = characters.map((character) => renderAvailabilitySummaryCard(character, selectedDate)).join("");
+  $("availabilityList").innerHTML = characters.length
+    ? characters.map((character) => renderCharacterAvailability(character, rangeDates)).join("")
+    : `<article class="record-card"><p class="muted">No characters match this filter.</p></article>`;
+}
+
+function getAvailabilityRange(startDate) {
+  return Array.from({ length: 7 }, (_, index) => addDays(startDate, index));
+}
+
+function getAvailabilityBookings() {
+  return getBookingSources().filter((lead) => {
+    if (!lead.eventDate) return false;
+    const statuses = ["booked", "tentative", "completed"];
+    return statuses.includes(lead.bookingStatus || "");
+  });
+}
+
+function renderAvailabilitySummaryCard(character, selectedDate) {
+  const dayBookings = getCharacterBookingsForDate(character.value, selectedDate);
+  const busy = dayBookings.length > 0;
+  return `
+    <article class="availability-card ${busy ? "busy" : "available"}">
+      <span>${escapeHtml(character.label)}</span>
+      <strong>${busy ? "Busy" : "Available"}</strong>
+      <small>${escapeHtml(formatReadableDate(selectedDate))}${busy ? ` · ${dayBookings.length} booking${dayBookings.length === 1 ? "" : "s"}` : ""}</small>
+    </article>
+  `;
+}
+
+function renderCharacterAvailability(character, rangeDates) {
+  return `
+    <article class="character-availability">
+      <div class="character-availability-header">
+        <h3>${escapeHtml(character.label)}</h3>
+        <span class="muted">${escapeHtml(formatCharacterStatus(character.value, state.availabilityFilters.date || today()))}</span>
+      </div>
+      <div class="character-week">
+        ${rangeDates.map((date) => renderCharacterDay(character.value, date)).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderCharacterDay(characterValue, date) {
+  const bookings = getCharacterBookingsForDate(characterValue, date);
+  const isBusy = bookings.length > 0;
+  return `
+    <div class="character-day ${isBusy ? "busy" : "available"}">
+      <div class="character-day-title">
+        <strong>${escapeHtml(formatDayLabel(date))}</strong>
+        <span>${isBusy ? "Busy" : "Free"}</span>
+      </div>
+      <div class="character-day-events">
+        ${isBusy ? bookings.map((lead) => renderAvailabilityBooking(lead)).join("") : `<span class="muted">No bookings</span>`}
+      </div>
+    </div>
+  `;
+}
+
+function getCharacterBookingsForDate(characterValue, date) {
+  const filters = state.availabilityFilters;
+  return getAvailabilityBookings()
+    .filter((lead) => lead.eventDate === date)
+    .filter((lead) => !filters.status || lead.bookingStatus === filters.status)
+    .filter((lead) => bookingUsesCharacter(lead, characterValue))
+    .sort(sortCalendarBookings);
+}
+
+function bookingUsesCharacter(lead, characterValue) {
+  return getLeadCharacters(lead).includes(characterValue);
+}
+
+function renderAvailabilityBooking(lead) {
+  const canSeeDetails = !lead.limited && (isOwner() || lead.ownerId === state.user?.uid);
+  if (!canSeeDetails) {
+    return `
+      <div class="availability-booking limited">
+        <strong>${escapeHtml(formatCalendarTime(lead))}</strong>
+        <span>Busy slot</span>
+        <span>${escapeHtml(bookingStatusLabel(lead.bookingStatus))}</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="availability-booking">
+      <strong>${escapeHtml(formatCalendarTime(lead))} - ${escapeHtml(leadTitle(lead))}</strong>
+      <span>${escapeHtml(bookingStatusLabel(lead.bookingStatus))}</span>
+      <span>${escapeHtml(lead.city || "No city")} · ${escapeHtml(packageLabel(lead.packageOption || ""))}</span>
+      <span>Manager: ${escapeHtml(lead.ownerName || lead.assignedManagerName || userName(lead.ownerId))}</span>
+    </div>
+  `;
+}
+
+function formatCharacterStatus(characterValue, date) {
+  const bookings = getCharacterBookingsForDate(characterValue, date);
+  return bookings.length ? `Busy on ${formatReadableDate(date)}` : `Available on ${formatReadableDate(date)}`;
+}
+
+function formatDayLabel(dateString) {
+  const date = parseIsoDate(dateString);
+  if (!date) return dateString;
+  return `${date.toLocaleDateString(undefined, { weekday: "short" })} ${formatDisplayDate(dateString)}`;
+}
+
+function formatReadableDate(dateString) {
+  return formatDisplayDate(dateString);
+}
+
+function formatDisplayDate(dateString) {
+  const date = parseIsoDate(dateString);
+  if (!date) return dateString || "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}/${day}/${date.getFullYear()}`;
+}
+
+function updateLeadConflictWarning() {
+  const warning = $("leadConflictWarning");
+  if (!warning) return [];
+  const payload = getLeadFormPayload();
+  const conflicts = findConflictingBookings({ ...payload, id: $("leadId").value });
+  renderLeadConflictWarning(conflicts);
+  return conflicts;
+}
+
+function renderLeadConflictWarning(conflicts) {
+  const warning = $("leadConflictWarning");
+  if (!warning) return;
+  warning.classList.toggle("hidden", !conflicts.length);
+  warning.innerHTML = conflicts.length
+    ? `
+      <strong>Conflict warning</strong>
+      <p>This character already has a booked/tentative event during overlapping time.</p>
+      <ul>
+        ${conflicts.map((conflict) => `<li>${escapeHtml(formatConflictDetail(conflict))}</li>`).join("")}
+      </ul>
+    `
+    : "";
+}
+
+function findConflictingBookings(lead, options = {}) {
+  const targetStatuses = options.includeCompletedTarget ? ["booked", "tentative", "completed"] : ["booked", "tentative"];
+  if (!targetStatuses.includes(lead.bookingStatus || "")) return [];
+
+  const targetRange = getLeadTimeRange(lead);
+  const targetCharacters = getLeadCharacters(lead);
+  if (!lead.eventDate || !targetRange || !targetCharacters.length) return [];
+
+  return getBookingSources()
+    .filter((booking) => booking.id !== lead.id)
+    .filter((booking) => booking.eventDate === lead.eventDate)
+    .filter((booking) => ["booked", "tentative"].includes(booking.bookingStatus || ""))
+    .map((booking) => {
+      const bookingRange = getLeadTimeRange(booking);
+      const sharedCharacters = intersectValues(targetCharacters, getLeadCharacters(booking));
+      if (!bookingRange || !sharedCharacters.length || !rangesOverlap(targetRange, bookingRange)) return null;
+      return { booking, sharedCharacters };
+    })
+    .filter(Boolean)
+    .sort((first, second) => sortCalendarBookings(first.booking, second.booking));
+}
+
+function getLeadCharacters(lead) {
+  return [
+    lead.mainCharacter || lead.character || "",
+    ...(Array.isArray(lead.additionalCharacters) ? lead.additionalCharacters : [])
+  ].filter(Boolean);
+}
+
+function getLeadTimeRange(lead) {
+  const start = timeToMinutes(lead.eventTime);
+  if (start === null) return null;
+  const explicitEnd = timeToMinutes(lead.eventEndTime);
+  const duration = parseDurationMinutes(lead.eventDuration) ?? 60;
+  const end = explicitEnd ?? start + duration;
+  return end > start ? { start, end } : null;
+}
+
+function timeToMinutes(value) {
+  if (!value || !value.includes(":")) return null;
+  const [hours, minutes] = value.split(":").map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+function parseDurationMinutes(value) {
+  if (!value) return null;
+  const text = String(value).toLowerCase();
+  const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours)/);
+  const minuteMatch = text.match(/(\d+(?:\.\d+)?)\s*(m|min|mins|minute|minutes)/);
+  const plainNumber = text.match(/^\s*(\d+(?:\.\d+)?)\s*$/);
+  const hours = hourMatch ? Number(hourMatch[1]) * 60 : 0;
+  const minutes = minuteMatch ? Number(minuteMatch[1]) : 0;
+  if (hours || minutes) return hours + minutes;
+  return plainNumber ? Number(plainNumber[1]) : null;
+}
+
+function rangesOverlap(first, second) {
+  return first.start < second.end && second.start < first.end;
+}
+
+function intersectValues(first, second) {
+  const secondSet = new Set(second);
+  return first.filter((value, index) => first.indexOf(value) === index && secondSet.has(value));
+}
+
+function formatConflictSummary(conflicts) {
+  return conflicts.map((conflict) => characterLabels(conflict.sharedCharacters).join(", ")).join("; ");
+}
+
+function formatConflictDetail(conflict) {
+  const booking = conflict.booking;
+  const characterText = characterLabels(conflict.sharedCharacters).join(", ");
+  const isOwnLead = booking.ownerId === state.user?.uid;
+  const canSeeDetails = !booking.limited && (isOwner() || isOwnLead);
+  if (!canSeeDetails) {
+    return `${formatCalendarTime(booking)} - Busy slot`;
+  }
+  return `${formatCalendarTime(booking)} - ${leadTitle(booking)} - ${characterText} - ${bookingStatusLabel(booking.bookingStatus)} - ${booking.city || "No city"} - ${packageLabel(booking.packageOption || "")} - Manager: ${booking.ownerName || booking.assignedManagerName || userName(booking.ownerId)}`;
 }
 
 function renderLeads() {
@@ -632,12 +1192,27 @@ function renderLeads() {
   document.querySelectorAll("[data-delete-lead]").forEach((button) => {
     button.addEventListener("click", () => deleteLead(button.dataset.deleteLead));
   });
+  document.querySelectorAll("[data-booking-transition]").forEach((button) => {
+    button.addEventListener("click", () => transitionBookingStatus(button.dataset.bookingTransition, button.dataset.nextBookingStatus));
+  });
 }
 
 function renderLeadCard(lead) {
   const normalizedLead = normalizeLead(lead);
-  const createdDate = formatDateTime(lead.createdAt) || lead.createdDate || "-";
-  const updatedDate = formatDateTime(lead.updatedAt) || lead.updatedDate || "-";
+  const createdDate = formatDateTime(lead.createdAt) || formatDisplayDate(lead.createdDate) || "-";
+  const updatedDate = formatDateTime(lead.updatedAt) || formatDisplayDate(lead.updatedDate) || "-";
+  const bookingStatus = lead.bookingStatus || "inquiry";
+  const conflicts = findConflictingBookings(lead);
+  const conflictBlock = conflicts.length
+    ? `
+      <div class="conflict-warning compact-warning">
+        <strong>Conflict warning</strong>
+        <ul>
+          ${conflicts.map((conflict) => `<li>${escapeHtml(formatConflictDetail(conflict))}</li>`).join("")}
+        </ul>
+      </div>
+    `
+    : "";
 
   return `
     <article class="record-card">
@@ -646,10 +1221,13 @@ function renderLeadCard(lead) {
           <div class="record-title">${escapeHtml(leadTitle(lead))}</div>
           <div class="record-meta">
             <span class="badge ${normalizedLead.status === "won" ? "success" : normalizedLead.status === "lost" ? "danger" : ""}">${escapeHtml(statusLabel(normalizedLead.status))}</span>
+            <span class="badge booking-badge ${escapeHtml(bookingStatusClass(bookingStatus))}">${escapeHtml(bookingStatusLabel(bookingStatus))}</span>
             <span>${escapeHtml(labelValue(lead.category || "No category"))}</span>
             <span>${escapeHtml(labelValue(lead.source || "No source"))}</span>
             <span>${escapeHtml(lead.city || "No city")}</span>
-            <span>Next: ${escapeHtml(lead.nextFollowUpDate || "No date")}</span>
+            <span>Event: ${escapeHtml(formatEventSchedule(lead))}</span>
+            <span>${escapeHtml(packageLabel(lead.packageOption || ""))}</span>
+            <span>Next: ${escapeHtml(formatDisplayDate(lead.nextFollowUpDate) || "No date")}</span>
             <span>Manager: ${escapeHtml(userName(lead.ownerId))}</span>
           </div>
         </div>
@@ -658,11 +1236,25 @@ function renderLeadCard(lead) {
           <button data-delete-lead="${lead.id}" class="danger" type="button">Delete</button>
         </div>
       </div>
+      ${renderBookingWorkflowActions(lead)}
       <p class="muted">${escapeHtml(lead.notes || "No notes")}</p>
+      ${conflictBlock}
       <div class="record-meta">
         <span>Contact: ${escapeHtml(lead.contactName || lead.name || "No contact")}</span>
         <span>${escapeHtml(lead.phone || "No phone")}</span>
         <span>${escapeHtml(lead.email || "No email")}</span>
+        <span>Address: ${escapeHtml(lead.eventAddress || "Not specified")}</span>
+        <span>Duration: ${escapeHtml(lead.eventDuration || "Not specified")}</span>
+        <span>Child: ${escapeHtml(formatChildInfo(lead))}</span>
+        <span>Guests: ${escapeHtml(lead.guestCount || "Not specified")}</span>
+        <span>Theme: ${escapeHtml(lead.eventTheme || "Not specified")}</span>
+        <span>Main character: ${escapeHtml(characterLabel(lead.mainCharacter || lead.character || ""))}</span>
+        <span>Additional characters: ${escapeHtml(characterLabels(lead.additionalCharacters).join(", ") || "None")}</span>
+        <span>Add-ons: ${escapeHtml(addOnLabels(lead.addOns).join(", ") || "None")}</span>
+        <span>Deposit paid: ${escapeHtml(booleanLabel(lead.depositPaid))}</span>
+        <span>Deposit amount: ${escapeHtml(formatMoneyField(lead.depositAmount))}</span>
+        <span>Balance due: ${escapeHtml(formatMoneyField(lead.balanceDue))}</span>
+        <span>Confirmed: ${escapeHtml(booleanLabel(lead.bookingConfirmed))}</span>
         <span>Created: ${escapeHtml(createdDate)}</span>
         <span>Updated: ${escapeHtml(updatedDate)}</span>
       </div>
@@ -670,40 +1262,99 @@ function renderLeadCard(lead) {
   `;
 }
 
-async function saveLead(event) {
-  event.preventDefault();
+function renderBookingWorkflowActions(lead) {
+  const transitions = getBookingTransitions(lead.bookingStatus || "inquiry");
+  if (!transitions.length) return "";
+  return `
+    <div class="booking-workflow">
+      <span class="muted">Booking workflow</span>
+      <div class="record-actions">
+        ${transitions.map((transition) => `
+          <button data-booking-transition="${lead.id}" data-next-booking-status="${transition.value}" type="button">
+            ${escapeHtml(transition.label)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function getBookingTransitions(status) {
+  const transitions = {
+    inquiry: [{ value: "tentative", label: "Move to tentative" }],
+    tentative: [{ value: "booked", label: "Confirm booked" }],
+    booked: [
+      { value: "completed", label: "Mark completed" },
+      { value: "cancelled", label: "Cancel booking" }
+    ]
+  };
+  return transitions[status] || [];
+}
+
+async function transitionBookingStatus(id, nextStatus) {
+  const lead = state.leads.find((item) => item.id === id);
+  if (!lead || !nextStatus) return;
+
+  const allowed = getBookingTransitions(lead.bookingStatus || "inquiry").some((transition) => transition.value === nextStatus);
+  if (!allowed) {
+    setGlobalMessage("This booking status transition is not allowed.", true);
+    return;
+  }
+
+  const conflicts = findConflictingBookings({ ...lead, bookingStatus: nextStatus });
+  if (conflicts.length) {
+    const confirmed = confirm(`Conflict warning: this character has ${conflicts.length} overlapping booking${conflicts.length === 1 ? "" : "s"}. Continue anyway?`);
+    if (!confirmed) return;
+  }
+
+  const message = `Move "${leadTitle(lead)}" from ${bookingStatusLabel(lead.bookingStatus || "inquiry")} to ${bookingStatusLabel(nextStatus)}?`;
+  if (!confirm(message)) return;
+
   try {
-    await withLoading("Saving lead...", async () => {
-      const id = $("leadId").value;
-      const assignedManagerId = isOwner() ? $("leadAssignedManager").value : state.user.uid;
-      const assignedManagerName = userName(assignedManagerId);
-      const payload = {
-        companyName: $("leadCompanyName").value.trim(),
-        contactName: $("leadContactName").value.trim(),
-        phone: $("leadPhone").value.trim(),
-        email: $("leadEmail").value.trim(),
-        city: $("leadCity").value.trim(),
-        category: $("leadCategory").value,
-        source: $("leadSource").value,
-        status: normalizeStatus($("leadStatus").value),
-        assignedManagerId,
-        assignedManagerName,
-        nextFollowUpDate: $("leadNextFollowUpDate").value,
-        notes: $("leadNotes").value.trim(),
-        ownerId: assignedManagerId,
-        ownerName: assignedManagerName,
+    await withLoading("Updating booking status...", async () => {
+      await updateDoc(doc(db, "leads", id), {
+        bookingStatus: nextStatus,
+        bookingConfirmed: nextStatus === "booked" || nextStatus === "completed" ? true : lead.bookingConfirmed || false,
         updatedDate: today(),
         updatedAt: serverTimestamp()
-      };
+      });
+      await updateBookingSlot(id, {
+        ...lead,
+        bookingStatus: nextStatus,
+        bookingConfirmed: nextStatus === "booked" || nextStatus === "completed" ? true : lead.bookingConfirmed || false
+      });
+      await loadData();
+    });
+    setGlobalMessage(`Booking moved to ${bookingStatusLabel(nextStatus)}.`);
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
+}
 
+async function saveLead(event) {
+  event.preventDefault();
+  const id = $("leadId").value;
+  const payload = getLeadFormPayload();
+  const conflicts = findConflictingBookings({ ...payload, id });
+  renderLeadConflictWarning(conflicts);
+
+  if (conflicts.length) {
+    const confirmed = confirm(`Conflict warning: this character has ${conflicts.length} overlapping booking${conflicts.length === 1 ? "" : "s"}. Save anyway?`);
+    if (!confirmed) return;
+  }
+
+  try {
+    await withLoading("Saving lead...", async () => {
       if (id) {
         await updateDoc(doc(db, "leads", id), payload);
+        await updateBookingSlot(id, payload);
       } else {
-        await addDoc(collection(db, "leads"), {
+        const newLeadRef = await addDoc(collection(db, "leads"), {
           ...payload,
           createdDate: today(),
           createdAt: serverTimestamp()
         });
+        await updateBookingSlot(newLeadRef.id, payload);
       }
 
       clearLeadForm();
@@ -713,6 +1364,48 @@ async function saveLead(event) {
   } catch (error) {
     setGlobalMessage(cleanError(error), true);
   }
+}
+
+function getLeadFormPayload() {
+  const assignedManagerId = isOwner() ? $("leadAssignedManager").value : state.user.uid;
+  const assignedManagerName = userName(assignedManagerId);
+  return {
+    companyName: $("leadCompanyName").value.trim(),
+    contactName: $("leadContactName").value.trim(),
+    phone: $("leadPhone").value.trim(),
+    email: $("leadEmail").value.trim(),
+    city: $("leadCity").value.trim(),
+    category: $("leadCategory").value,
+    source: $("leadSource").value,
+    status: normalizeStatus($("leadStatus").value),
+    childAge: $("leadChildAge").value,
+    childGender: $("leadChildGender").value,
+    guestCount: $("leadGuestCount").value,
+    eventDate: $("leadEventDate").value,
+    eventTime: $("leadEventTime").value,
+    eventEndTime: $("leadEventEndTime").value,
+    eventDuration: $("leadEventDuration").value.trim(),
+    eventAddress: $("leadEventAddress").value.trim(),
+    eventTheme: $("leadEventTheme").value.trim(),
+    packageOption: $("leadPackageOption").value,
+    bookingStatus: $("leadBookingStatus").value,
+    mainCharacter: $("leadMainCharacter").value,
+    additionalCharacters: selectedValues("leadAdditionalCharacters"),
+    character: $("leadMainCharacter").value,
+    addOns: selectedValues("leadAddOns"),
+    depositPaid: $("leadDepositPaid").checked,
+    depositAmount: $("leadDepositAmount").value,
+    balanceDue: $("leadBalanceDue").value,
+    bookingConfirmed: $("leadBookingConfirmed").value === "yes",
+    assignedManagerId,
+    assignedManagerName,
+    nextFollowUpDate: $("leadNextFollowUpDate").value,
+    notes: $("leadNotes").value.trim(),
+    ownerId: assignedManagerId,
+    ownerName: assignedManagerName,
+    updatedDate: today(),
+    updatedAt: serverTimestamp()
+  };
 }
 
 function editLead(id) {
@@ -727,10 +1420,29 @@ function editLead(id) {
   $("leadCategory").value = lead.category || "other";
   $("leadSource").value = lead.source || "other";
   $("leadStatus").value = normalizeStatus(lead.status || "new_lead");
+  $("leadChildAge").value = lead.childAge || "";
+  $("leadChildGender").value = lead.childGender || "";
+  $("leadGuestCount").value = lead.guestCount || "";
+  $("leadEventDate").value = lead.eventDate || "";
+  $("leadEventTime").value = lead.eventTime || "";
+  $("leadEventEndTime").value = lead.eventEndTime || "";
+  $("leadEventDuration").value = lead.eventDuration || "";
+  $("leadEventAddress").value = lead.eventAddress || "";
+  $("leadEventTheme").value = lead.eventTheme || "";
+  $("leadPackageOption").value = lead.packageOption || "";
+  $("leadBookingStatus").value = lead.bookingStatus || "inquiry";
+  $("leadMainCharacter").value = lead.mainCharacter || lead.character || "";
+  setSelectedValues("leadAdditionalCharacters", lead.additionalCharacters || []);
+  setSelectedValues("leadAddOns", lead.addOns || []);
+  $("leadDepositPaid").checked = Boolean(lead.depositPaid);
+  $("leadDepositAmount").value = lead.depositAmount || "";
+  $("leadBalanceDue").value = lead.balanceDue || "";
+  $("leadBookingConfirmed").value = lead.bookingConfirmed ? "yes" : "no";
   $("leadAssignedManager").value = lead.ownerId || state.user.uid;
   $("leadNextFollowUpDate").value = lead.nextFollowUpDate || "";
   $("leadNotes").value = lead.notes || "";
   showSection("leadsSection");
+  updateLeadConflictWarning();
 }
 
 async function deleteLead(id) {
@@ -738,6 +1450,7 @@ async function deleteLead(id) {
   try {
     await withLoading("Deleting lead...", async () => {
       await deleteDoc(doc(db, "leads", id));
+      await deleteDoc(doc(db, "bookingSlots", id)).catch(() => {});
       await loadData();
     });
     setGlobalMessage("Lead deleted.");
@@ -749,6 +1462,7 @@ async function deleteLead(id) {
 function clearLeadForm() {
   els.leadForm.reset();
   $("leadId").value = "";
+  renderLeadConflictWarning([]);
   renderManagerOptions();
 }
 
@@ -941,6 +1655,25 @@ function getFilteredLeads() {
       lead.source,
       normalizedLead.status,
       statusLabel(normalizedLead.status),
+      lead.childAge,
+      lead.childGender,
+      lead.guestCount,
+      lead.eventDate,
+      lead.eventTime,
+      lead.eventEndTime,
+      lead.eventDuration,
+      lead.eventAddress,
+      lead.eventTheme,
+      lead.bookingStatus,
+      bookingStatusLabel(lead.bookingStatus || "inquiry"),
+      packageLabel(lead.packageOption || ""),
+      characterLabel(lead.mainCharacter || lead.character || ""),
+      characterLabels(lead.additionalCharacters).join(" "),
+      addOnLabels(lead.addOns).join(" "),
+      booleanLabel(lead.depositPaid),
+      lead.depositAmount,
+      lead.balanceDue,
+      booleanLabel(lead.bookingConfirmed),
       lead.notes,
       lead.ownerName,
       lead.assignedManagerName
@@ -995,7 +1728,7 @@ function renderFollowUpQueueCard(lead) {
           <div class="record-title">${escapeHtml(leadTitle(lead))}</div>
           <div class="record-meta">
             <span class="badge ${isOverdue ? "danger" : ""}">${isOverdue ? "Overdue" : "Today"}</span>
-            <span>Next follow-up: ${escapeHtml(lead.nextFollowUpDate)}</span>
+            <span>Next follow-up: ${escapeHtml(formatDisplayDate(lead.nextFollowUpDate))}</span>
             <span>Status: ${escapeHtml(statusLabel(lead.status))}</span>
             <span>Manager: ${escapeHtml(userName(lead.ownerId))}</span>
             <span>${escapeHtml(lead.phone || "No phone")}</span>
@@ -1070,7 +1803,7 @@ function renderFollowUpCard(item) {
           <div class="record-meta">
             <span class="badge ${item.status === "done" ? "success" : isDue ? "danger" : ""}">${escapeHtml(item.status)}</span>
             <span>${escapeHtml(item.type)}</span>
-            <span>Due: ${escapeHtml(item.dueDate)}</span>
+            <span>Due: ${escapeHtml(formatDisplayDate(item.dueDate))}</span>
             ${isOwner() ? `<span>${escapeHtml(userName(item.ownerId))}</span>` : ""}
           </div>
         </div>
@@ -1250,7 +1983,7 @@ function renderReportCard(report) {
     <article class="record-card">
       <div class="record-header">
         <div>
-          <div class="record-title">${escapeHtml(report.date)}</div>
+          <div class="record-title">${escapeHtml(formatDisplayDate(report.date))}</div>
           <div class="record-meta">
             <span>New leads: ${normalizedReport.newLeads}</span>
             <span>Outreaches: ${normalizedReport.newOutreaches}</span>
@@ -1280,6 +2013,7 @@ function renderOwnerDashboard() {
   $("ownerLeadCount").textContent = state.leads.length;
   $("ownerRevenue").textContent = state.leads.filter((lead) => normalizeStatus(lead.status) === "won").length;
   $("ownerOpenFollowUps").textContent = openFollowUps;
+  renderOwnerBookedEvents();
 
   $("ownerTeamList").innerHTML = state.users.map((user) => {
     const leads = state.leads.filter((lead) => lead.ownerId === user.uid);
@@ -1299,6 +2033,14 @@ function renderOwnerDashboard() {
   }).join("") || `<p class="muted">No team members yet.</p>`;
   renderOwnerChecklistProgress();
   renderOwnerReports();
+}
+
+function renderOwnerBookedEvents() {
+  const bookings = getUpcomingBookedEvents(state.calendarLeads);
+  $("ownerBookedCount").textContent = `${bookings.length} ${bookings.length === 1 ? "event" : "events"}`;
+  $("ownerBookedEvents").innerHTML = bookings.length
+    ? bookings.slice(0, 12).map((lead) => renderUpcomingBookedEvent(lead, { ownerView: true })).join("")
+    : `<article class="record-card"><p class="muted">No upcoming booked events.</p></article>`;
 }
 
 function renderAdminPanel() {
@@ -1381,7 +2123,7 @@ function renderAdminLeadAssignments() {
           <div class="record-meta">
             <span>Status: ${escapeHtml(statusLabel(lead.status))}</span>
             <span>Current manager: ${escapeHtml(userName(lead.ownerId))}</span>
-            <span>Next: ${escapeHtml(lead.nextFollowUpDate || "No date")}</span>
+            <span>Next: ${escapeHtml(formatDisplayDate(lead.nextFollowUpDate) || "No date")}</span>
           </div>
         </div>
       </div>
@@ -1452,6 +2194,16 @@ async function assignLeadToManager(leadId, managerId) {
         updatedDate: today(),
         updatedAt: serverTimestamp()
       });
+      const lead = state.calendarLeads.find((item) => item.id === leadId) || state.leads.find((item) => item.id === leadId);
+      if (lead) {
+        await updateBookingSlot(leadId, {
+          ...lead,
+          ownerId: manager.uid,
+          ownerName: manager.displayName || manager.email,
+          assignedManagerId: manager.uid,
+          assignedManagerName: manager.displayName || manager.email
+        });
+      }
       await loadData();
     });
     setGlobalMessage("Lead assigned.");
@@ -1483,6 +2235,17 @@ function leadName(leadId) {
 
 function labelRole(role) {
   return role === "owner" ? "Owner" : "Sales manager";
+}
+
+function selectedValues(id) {
+  return Array.from($(id).selectedOptions).map((option) => option.value);
+}
+
+function setSelectedValues(id, values) {
+  const selected = new Set(Array.isArray(values) ? values : []);
+  Array.from($(id).options).forEach((option) => {
+    option.selected = selected.has(option.value);
+  });
 }
 
 function normalizeEmail(email) {
@@ -1539,11 +2302,29 @@ function exportLeadRow(lead) {
     category: labelValue(lead.category || ""),
     source: labelValue(lead.source || ""),
     status: statusLabel(lead.status),
+    childAge: lead.childAge || "",
+    childGender: lead.childGender || "",
+    guestCount: lead.guestCount || "",
+    eventDate: formatDisplayDate(lead.eventDate),
+    eventTime: lead.eventTime || "",
+    eventEndTime: lead.eventEndTime || "",
+    eventDuration: lead.eventDuration || "",
+    eventAddress: lead.eventAddress || "",
+    eventTheme: lead.eventTheme || "",
+    bookingStatus: bookingStatusLabel(lead.bookingStatus || "inquiry"),
+    packageOption: packageLabel(lead.packageOption || ""),
+    mainCharacter: characterLabel(lead.mainCharacter || lead.character || ""),
+    additionalCharacters: characterLabels(lead.additionalCharacters).join("; "),
+    addOns: addOnLabels(lead.addOns).join("; "),
+    depositPaid: booleanLabel(lead.depositPaid),
+    depositAmount: lead.depositAmount || "",
+    balanceDue: lead.balanceDue || "",
+    bookingConfirmed: booleanLabel(lead.bookingConfirmed),
     assignedManager: userName(lead.ownerId),
-    nextFollowUpDate: lead.nextFollowUpDate || "",
+    nextFollowUpDate: formatDisplayDate(lead.nextFollowUpDate),
     notes: lead.notes || "",
-    createdDate: lead.createdDate || formatDateTime(lead.createdAt),
-    updatedDate: lead.updatedDate || formatDateTime(lead.updatedAt)
+    createdDate: formatDisplayDate(lead.createdDate) || formatDateTime(lead.createdAt),
+    updatedDate: formatDisplayDate(lead.updatedDate) || formatDateTime(lead.updatedAt)
   };
 }
 
@@ -1551,7 +2332,7 @@ function exportReportRow(report) {
   const normalizedReport = normalizeReport(report);
   return {
     id: report.id,
-    date: report.date || "",
+    date: formatDisplayDate(report.date),
     manager: userName(report.ownerId),
     newLeads: normalizedReport.newLeads,
     newOutreaches: normalizedReport.newOutreaches,
@@ -1571,7 +2352,7 @@ function exportFollowUpRow(followUp) {
   return {
     id: followUp.id,
     lead: leadName(followUp.leadId),
-    dueDate: followUp.dueDate || "",
+    dueDate: formatDisplayDate(followUp.dueDate),
     type: followUp.type || "",
     status: followUp.status || "",
     manager: userName(followUp.ownerId),
@@ -1585,7 +2366,7 @@ function exportChecklistRow(checklist) {
   const goals = checklist.goals || {};
   return {
     id: checklist.id,
-    date: checklist.date || "",
+    date: formatDisplayDate(checklist.date),
     manager: userName(checklist.ownerId),
     newCrmContacts: goals.newCrmContacts || 0,
     newOutreaches: goals.newOutreaches || 0,
@@ -1667,7 +2448,7 @@ function calculateChecklistProgress(goals = {}) {
 }
 
 function renderOwnerChecklistProgress() {
-  $("ownerChecklistDate").textContent = today();
+  $("ownerChecklistDate").textContent = formatDisplayDate(today());
   const team = state.users.filter((user) => ["owner", "sales_manager"].includes(user.role));
   $("ownerChecklistProgress").innerHTML = team.map((user) => {
     const checklist = state.teamChecklists.find((item) => item.ownerId === user.uid);
@@ -1739,6 +2520,64 @@ function labelValue(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function optionLabel(options, value) {
+  return options.find((item) => item.value === value)?.label || (value ? labelValue(value) : "Not selected");
+}
+
+function packageLabel(value) {
+  return optionLabel(PACKAGE_OPTIONS, value);
+}
+
+function bookingStatusLabel(value) {
+  return optionLabel(BOOKING_STATUSES, value || "inquiry");
+}
+
+function bookingStatusClass(value) {
+  return ["inquiry", "tentative", "booked", "completed", "cancelled"].includes(value) ? value : "inquiry";
+}
+
+function characterLabel(value) {
+  return optionLabel(CHARACTER_OPTIONS, value);
+}
+
+function characterLabels(values) {
+  if (!Array.isArray(values)) return [];
+  return values.map((value) => characterLabel(value));
+}
+
+function addOnLabels(values) {
+  if (!Array.isArray(values)) return [];
+  return values.map((value) => optionLabel(ADD_ON_OPTIONS, value));
+}
+
+function booleanLabel(value) {
+  return value ? "Yes" : "No";
+}
+
+function formatMoneyField(value) {
+  return value === undefined || value === null || value === "" ? "Not specified" : money(value);
+}
+
+function formatChildInfo(lead) {
+  const parts = [];
+  if (lead.childAge) parts.push(`${lead.childAge} years old`);
+  if (lead.childGender) parts.push(labelValue(lead.childGender));
+  return parts.join(", ") || "Not specified";
+}
+
+function formatEventSchedule(lead) {
+  const parts = [];
+  if (lead.eventDate) parts.push(formatDisplayDate(lead.eventDate));
+  if (lead.eventTime && lead.eventEndTime) {
+    parts.push(`${lead.eventTime}-${lead.eventEndTime}`);
+  } else if (lead.eventTime) {
+    parts.push(lead.eventTime);
+  } else if (lead.eventEndTime) {
+    parts.push(`ends ${lead.eventEndTime}`);
+  }
+  return parts.join(" at ") || "No date/time";
+}
+
 function normalizeLead(lead) {
   return { ...lead, status: normalizeStatus(lead.status) };
 }
@@ -1785,13 +2624,26 @@ function formatDateTime(value) {
   if (!value) return "";
   const date = value.toDate ? value.toDate() : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString();
+  return `${formatDisplayDate(formatLocalIsoDate(date))} ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 }
 
 function addDays(dateString, days) {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function parseIsoDate(dateString) {
+  if (!dateString) return null;
+  const date = new Date(`${dateString}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatLocalIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function renderKpiDashboard() {

@@ -46,3 +46,14 @@ YOUR_USERNAME.github.io
 ```
 
 Do not include `https://` or the repository path.
+
+## Production Check
+
+After GitHub Pages publishes:
+
+1. Open the site in a private browser window.
+2. Register or log in with an approved owner email.
+3. Confirm Firebase Auth authorized domains includes the GitHub Pages domain.
+4. Open Firestore Rules and publish the included `firestore.rules`.
+5. Confirm the app loads without browser console errors.
+6. Test the mobile layout from your phone.

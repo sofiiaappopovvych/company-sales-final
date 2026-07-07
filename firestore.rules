@@ -20,9 +20,25 @@ service cloud.firestore {
     function approvedUserEmails() {
       return [
         "skillfulsweing@gmail.com",
-        "snek.sova@gmail.com",
-        "sales@funandjoy.io"
+        "sales@funandjoy.io",
+        "snek.sova@gmail.com"
       ];
+    }
+
+    function validBookingSlot() {
+      return request.resource.data.keys().hasOnly([
+        "leadId",
+        "ownerId",
+        "eventDate",
+        "eventTime",
+        "eventEndTime",
+        "eventDuration",
+        "bookingStatus",
+        "mainCharacter",
+        "additionalCharacters",
+        "character",
+        "updatedAt"
+      ]);
     }
 
     function approvedEmail() {
@@ -63,6 +79,12 @@ service cloud.firestore {
       allow create: if isOwner() || ownsIncoming();
       allow read: if isOwner() || ownsExisting();
       allow update: if isOwner() || (ownsExisting() && ownsIncoming());
+      allow delete: if isOwner() || ownsExisting();
+    }
+
+    match /bookingSlots/{slotId} {
+      allow read: if isActive();
+      allow create, update: if (isOwner() || ownsIncoming()) && validBookingSlot();
       allow delete: if isOwner() || ownsExisting();
     }
 

@@ -40,7 +40,19 @@
 5. Select a region.
 6. Create the database.
 
-## 6. Publish Security Rules
+## 6. Confirm Approved Emails
+
+This package already includes:
+
+| Email | Role |
+| --- | --- |
+| `skillfulsweing@gmail.com` | Owner |
+| `sales@funandjoy.io` | Owner |
+| `snek.sova@gmail.com` | Sales manager |
+
+If you add more people later, update both `app-config.js` and `firestore.rules`.
+
+## 7. Publish Security Rules
 
 1. Open Firestore Database.
 2. Go to Rules.
@@ -48,11 +60,12 @@
 4. Confirm owner and manager emails are listed in the rules.
 5. Click Publish.
 
-## 7. Create First Owner
+The rules protect full CRM leads and allow managers to read only sanitized `bookingSlots` for other managers' busy times.
 
-1. Add the owner email to `OWNER_EMAILS` in `app-config.js`.
-2. Add the same owner email to `ownerEmails()` and `approvedUserEmails()` in `firestore.rules`.
-3. Upload the files to GitHub Pages.
-4. Open the site.
-5. Register with the owner email.
-6. The app automatically creates the owner profile.
+## 8. Create First Owner
+
+1. Upload the files to GitHub Pages.
+2. Open the site.
+3. Register with `skillfulsweing@gmail.com` or `sales@funandjoy.io`.
+4. The app automatically creates the owner profile.
+5. After owner login, the app syncs sanitized booking slots for existing booked/tentative/completed leads.

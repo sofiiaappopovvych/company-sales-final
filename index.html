@@ -64,6 +64,8 @@
           <button class="nav-btn active" data-section="dashboardSection" type="button">Dashboard</button>
           <button class="nav-btn" data-section="kpiSection" type="button">KPI Dashboard</button>
           <button class="nav-btn" data-section="leadsSection" type="button">CRM Leads</button>
+          <button class="nav-btn" data-section="calendarSection" type="button">Booking Calendar</button>
+          <button class="nav-btn" data-section="availabilitySection" type="button">Character Availability</button>
           <button class="nav-btn" data-section="checklistSection" type="button">Daily Checklist</button>
           <button class="nav-btn" data-section="followUpsSection" type="button">Follow-up</button>
           <button class="nav-btn" data-section="reportsSection" type="button">Daily Reports</button>
@@ -120,6 +122,13 @@
             </div>
             <article class="panel">
               <div class="panel-heading">
+                <h3>Upcoming Booked Events</h3>
+                <span id="dashboardBookedCount" class="muted">0 events</span>
+              </div>
+              <div id="dashboardBookedEvents" class="records compact"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
                 <div>
                   <h3>Backup / Export CSV</h3>
                   <p class="muted">Exports the data available to your role. Owner exports all team data; managers export only their own records.</p>
@@ -171,6 +180,81 @@
                 <span id="kpiLeaderboardCount" class="muted">0 managers</span>
               </div>
               <div id="kpiLeaderboard" class="records compact"></div>
+            </article>
+          </section>
+
+          <section id="calendarSection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Bookings</p>
+                <h2>Booking Calendar</h2>
+              </div>
+              <div class="calendar-actions">
+                <button id="calendarPrevBtn" class="secondary" type="button">Previous</button>
+                <button id="calendarTodayBtn" class="secondary" type="button">Today</button>
+                <button id="calendarNextBtn" class="secondary" type="button">Next</button>
+              </div>
+            </div>
+            <article class="panel calendar-panel">
+              <div class="panel-heading">
+                <h3 id="calendarMonthLabel">Month</h3>
+                <span id="calendarCount" class="muted">0 bookings</span>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span>Sun</span>
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+              </div>
+              <div id="bookingCalendar" class="booking-calendar"></div>
+            </article>
+          </section>
+
+          <section id="availabilitySection" class="page-section hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Characters</p>
+                <h2>Character Availability</h2>
+              </div>
+              <button id="availabilityTodayBtn" class="secondary" type="button">Today</button>
+            </div>
+            <article class="panel availability-filters">
+              <label>
+                Character
+                <select id="availabilityCharacter">
+                  <option value="">All characters</option>
+                  <option value="giant_bear">Giant bear</option>
+                  <option value="white_bear">White bear</option>
+                  <option value="panda">Panda</option>
+                  <option value="brown_bear">Brown bear</option>
+                  <option value="mirror_tiger">Mirror tiger</option>
+                  <option value="custom_character">Other / custom</option>
+                </select>
+              </label>
+              <label>
+                Date
+                <input id="availabilityDate" type="date" />
+              </label>
+              <label>
+                Booking status
+                <select id="availabilityStatus">
+                  <option value="">Booked, tentative, completed</option>
+                  <option value="booked">Booked</option>
+                  <option value="tentative">Tentative</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+            </article>
+            <div id="availabilitySummary" class="availability-summary"></div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3 id="availabilityRangeLabel">7-day availability</h3>
+                <span id="availabilityCount" class="muted">0 bookings</span>
+              </div>
+              <div id="availabilityList" class="availability-list"></div>
             </article>
           </section>
 
@@ -239,6 +323,126 @@
                   <option value="proposal_sent">Proposal Sent</option>
                   <option value="won">Won</option>
                   <option value="lost">Lost</option>
+                </select>
+              </label>
+              <label>
+                Child age
+                <input id="leadChildAge" type="number" min="0" max="18" placeholder="5" />
+              </label>
+              <label>
+                Child gender
+                <select id="leadChildGender">
+                  <option value="">Not specified</option>
+                  <option value="girl">Girl</option>
+                  <option value="boy">Boy</option>
+                  <option value="mixed">Mixed group</option>
+                </select>
+              </label>
+              <label>
+                Guests
+                <input id="leadGuestCount" type="number" min="0" placeholder="20" />
+              </label>
+              <label>
+                Event date
+                <input id="leadEventDate" type="date" />
+              </label>
+              <label>
+                Event time
+                <input id="leadEventTime" type="time" />
+              </label>
+              <label>
+                Event end time
+                <input id="leadEventEndTime" type="time" />
+              </label>
+              <label>
+                Event duration
+                <input id="leadEventDuration" type="text" placeholder="60 minutes, 2 hours..." />
+              </label>
+              <label class="full">
+                Event address
+                <input id="leadEventAddress" type="text" placeholder="Full address or venue name" />
+              </label>
+              <label>
+                Party theme
+                <input id="leadEventTheme" type="text" placeholder="Princess, Spider-Man, safari..." />
+              </label>
+              <label>
+                Package option
+                <select id="leadPackageOption">
+                  <option value="">Not selected</option>
+                  <option value="birthday_option_1">Option 1 - $200 - 30 minutes - 1 character</option>
+                  <option value="birthday_special_option">Special Option - $350 - 45 minutes - bear drum show</option>
+                  <option value="birthday_option_2">Option 2 - $550 - 60 minutes - host + character</option>
+                  <option value="birthday_option_3">Option 3 - $700 - 90 minutes - silver show</option>
+                  <option value="festival_most_popular">Festival/corporate - $2400 - up to 6 hours</option>
+                  <option value="custom">Custom package</option>
+                </select>
+              </label>
+              <label>
+                Booking status
+                <select id="leadBookingStatus">
+                  <option value="inquiry">Inquiry</option>
+                  <option value="tentative">Tentative</option>
+                  <option value="booked">Booked</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+              <label>
+                Main character
+                <select id="leadMainCharacter">
+                  <option value="">Not selected</option>
+                  <option value="giant_bear">Giant bear</option>
+                  <option value="white_bear">White bear</option>
+                  <option value="panda">Panda</option>
+                  <option value="brown_bear">Brown bear</option>
+                  <option value="mirror_tiger">Mirror tiger</option>
+                  <option value="custom_character">Other / custom</option>
+                </select>
+              </label>
+              <label class="full">
+                Additional characters
+                <select id="leadAdditionalCharacters" multiple size="5">
+                  <option value="giant_bear">Giant bear</option>
+                  <option value="white_bear">White bear</option>
+                  <option value="panda">Panda</option>
+                  <option value="brown_bear">Brown bear</option>
+                  <option value="mirror_tiger">Mirror tiger</option>
+                  <option value="custom_character">Other / custom</option>
+                </select>
+              </label>
+              <div id="leadConflictWarning" class="conflict-warning full hidden" role="alert"></div>
+              <label class="full">
+                Add-ons
+                <select id="leadAddOns" multiple size="5">
+                  <option value="additional_character">Additional character - $150</option>
+                  <option value="extra_30_minutes">Additional 30 minutes - $100</option>
+                  <option value="desserts_cake">Desserts & cake - from $150</option>
+                  <option value="flower_bouquet">Flower bouquet - from $90</option>
+                  <option value="decorations">Decorations - from $750</option>
+                  <option value="helium_balloons">Helium balloons - $120</option>
+                  <option value="bubble_machine">Bubble machine - $40</option>
+                  <option value="face_painting">Face painting - $150/hour</option>
+                  <option value="balloon_sticks">Balloon sticks - $4 per child</option>
+                </select>
+              </label>
+              <label>
+                <span>Deposit paid</span>
+                <input id="leadDepositPaid" type="checkbox" />
+              </label>
+              <label>
+                Deposit amount
+                <input id="leadDepositAmount" type="number" min="0" step="0.01" placeholder="50" />
+              </label>
+              <label>
+                Balance due
+                <input id="leadBalanceDue" type="number" min="0" step="0.01" placeholder="300" />
+              </label>
+              <label>
+                Booking confirmed
+                <select id="leadBookingConfirmed">
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
                 </select>
               </label>
               <label>
@@ -550,6 +754,13 @@
                 <strong id="ownerOpenFollowUps">0</strong>
               </article>
             </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>Upcoming Booked Events</h3>
+                <span id="ownerBookedCount" class="muted">0 events</span>
+              </div>
+              <div id="ownerBookedEvents" class="records compact"></div>
+            </article>
             <article class="panel">
               <h3>Team Activity</h3>
               <div id="ownerTeamList" class="records compact"></div>
