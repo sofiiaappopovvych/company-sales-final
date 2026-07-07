@@ -7,7 +7,7 @@ export const OWNER_EMAILS = [
 ];
 
 export const APPROVED_MANAGER_EMAILS = [
-  // "manager@example.com"
+  "snek.sova@gmail.com"
 ];
 
 export const APPROVED_USER_EMAILS = [
