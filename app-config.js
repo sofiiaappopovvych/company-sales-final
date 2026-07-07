@@ -3,7 +3,8 @@
 // Owner emails automatically receive the owner role during registration.
 
 export const OWNER_EMAILS = [
-  "skillfulsweing@gmail.com"
+  "skillfulsweing@gmail.com",
+  "sales@funandjoy.io"
 ];
 
 export const APPROVED_MANAGER_EMAILS = [
