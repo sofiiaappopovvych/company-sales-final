@@ -3,11 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Company Sales Hub MVP</title>
+    <title>Company Sales Hub</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div id="app">
+      <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite">
+        <div class="loading-card">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="loadingText">Loading...</span>
+        </div>
+      </div>
       <section id="authView" class="auth-shell">
         <div class="auth-card">
           <p class="eyebrow">Internal Sales Tool</p>
@@ -45,7 +51,7 @@
       <section id="hubView" class="hidden">
         <header class="topbar">
           <div>
-            <p class="eyebrow">CRM v2.0</p>
+            <p class="eyebrow">Production v1.0</p>
             <h1>Company Sales Hub</h1>
           </div>
           <div class="user-box">
@@ -68,6 +74,7 @@
         </nav>
 
         <main>
+          <p id="globalMessage" class="message global-message" role="status"></p>
           <section id="dashboardSection" class="page-section">
             <div class="section-heading">
               <div>
@@ -111,6 +118,20 @@
                 <div id="dashboardLeads" class="list"></div>
               </article>
             </div>
+            <article class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>Backup / Export CSV</h3>
+                  <p class="muted">Exports the data available to your role. Owner exports all team data; managers export only their own records.</p>
+                </div>
+              </div>
+              <div class="export-actions">
+                <button id="exportLeadsBtn" class="secondary" type="button">Export leads CSV</button>
+                <button id="exportReportsBtn" class="secondary" type="button">Export reports CSV</button>
+                <button id="exportFollowUpsBtn" class="secondary" type="button">Export follow-ups CSV</button>
+                <button id="exportChecklistsBtn" class="secondary" type="button">Export checklists CSV</button>
+              </div>
+            </article>
           </section>
 
           <section id="kpiSection" class="page-section hidden">

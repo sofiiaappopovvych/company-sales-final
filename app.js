@@ -352,6 +352,9 @@ const els = {
   displayName: $("displayName"),
   authSubmit: $("authSubmit"),
   authMessage: $("authMessage"),
+  globalMessage: $("globalMessage"),
+  loadingOverlay: $("loadingOverlay"),
+  loadingText: $("loadingText"),
   userSummary: $("userSummary"),
   logoutBtn: $("logoutBtn"),
   refreshBtn: $("refreshBtn"),
@@ -381,6 +384,10 @@ function bindEvents() {
   $("filterCategory").addEventListener("change", updateLeadFilters);
   $("filterManager").addEventListener("change", updateLeadFilters);
   $("clearLeadFiltersBtn").addEventListener("click", clearLeadFilters);
+  $("exportLeadsBtn").addEventListener("click", () => exportCsv("leads"));
+  $("exportReportsBtn").addEventListener("click", () => exportCsv("reports"));
+  $("exportFollowUpsBtn").addEventListener("click", () => exportCsv("followUps"));
+  $("exportChecklistsBtn").addEventListener("click", () => exportCsv("checklists"));
   $("playbookSearch").addEventListener("input", updatePlaybookSearch);
   $("playbookLanguage").addEventListener("change", updatePlaybookLanguage);
   $("clearPlaybookSearchBtn").addEventListener("click", clearPlaybookSearch);
@@ -418,25 +425,27 @@ async function handleAuthSubmit(event) {
   const password = els.authPassword.value;
 
   try {
-    if (!isApprovedEmail(email)) {
-      throw new Error("This email is not approved for company access.");
-    }
+    await withLoading(state.mode === "register" ? "Creating account..." : "Logging in...", async () => {
+      if (!isApprovedEmail(email)) {
+        throw new Error("This email is not approved for company access.");
+      }
 
-    if (state.mode === "register") {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      const name = els.displayName.value.trim() || email;
-      await updateProfile(credential.user, { displayName: name });
-      await setDoc(doc(db, "users", credential.user.uid), {
-        uid: credential.user.uid,
-        email,
-        displayName: name,
-        role: roleForEmail(email),
-        disabled: false,
-        createdAt: serverTimestamp()
-      });
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
-    }
+      if (state.mode === "register") {
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        const name = els.displayName.value.trim() || email;
+        await updateProfile(credential.user, { displayName: name });
+        await setDoc(doc(db, "users", credential.user.uid), {
+          uid: credential.user.uid,
+          email,
+          displayName: name,
+          role: roleForEmail(email),
+          disabled: false,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    });
     els.authForm.reset();
   } catch (error) {
     setMessage(els.authMessage, cleanError(error), true);
@@ -453,11 +462,17 @@ async function handleAuthState(user) {
     return;
   }
 
-  await ensureUserProfile(user);
-  if (!state.profile || state.profile.disabled) return;
-  els.authView.classList.add("hidden");
-  els.hubView.classList.remove("hidden");
-  await loadData();
+  try {
+    await withLoading("Loading workspace...", async () => {
+      await ensureUserProfile(user);
+      if (!state.profile || state.profile.disabled) return;
+      els.authView.classList.add("hidden");
+      els.hubView.classList.remove("hidden");
+      await loadData();
+    });
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 async function ensureUserProfile(user) {
@@ -502,23 +517,30 @@ function isOwner() {
 async function loadData() {
   if (!state.user || !state.profile) return;
 
-  const scopeField = isOwner() ? null : where("ownerId", "==", state.user.uid);
-  const [users, leads, followUps, reports, teamChecklists] = await Promise.all([
-    isOwner() ? getDocs(collection(db, "users")) : Promise.resolve({ docs: [] }),
-    getDocs(buildScopedQuery("leads", scopeField)),
-    getDocs(buildScopedQuery("followUps", scopeField)),
-    getDocs(buildScopedQuery("dailyReports", scopeField)),
-    isOwner() ? getDocs(query(collection(db, "dailyChecklists"), where("date", "==", today()))) : Promise.resolve({ docs: [] })
-  ]);
+  try {
+    await withLoading("Syncing latest data...", async () => {
+      const scopeField = isOwner() ? null : where("ownerId", "==", state.user.uid);
+      const [users, leads, followUps, reports, teamChecklists] = await Promise.all([
+        isOwner() ? getDocs(collection(db, "users")) : Promise.resolve({ docs: [] }),
+        getDocs(buildScopedQuery("leads", scopeField)),
+        getDocs(buildScopedQuery("followUps", scopeField)),
+        getDocs(buildScopedQuery("dailyReports", scopeField)),
+        isOwner() ? getDocs(query(collection(db, "dailyChecklists"), where("date", "==", today()))) : Promise.resolve({ docs: [] })
+      ]);
 
-  state.users = users.docs.map(toRecord);
-  state.leads = leads.docs.map(toRecord).sort(sortBy("createdAt", "desc"));
-  state.followUps = followUps.docs.map(toRecord).sort(sortBy("dueDate", "asc"));
-  state.reports = reports.docs.map(toRecord).sort(sortBy("date", "desc"));
-  state.teamChecklists = teamChecklists.docs.map(toRecord);
+      state.users = users.docs.map(toRecord);
+      state.leads = leads.docs.map(toRecord).sort(sortBy("createdAt", "desc"));
+      state.followUps = followUps.docs.map(toRecord).sort(sortBy("dueDate", "asc"));
+      state.reports = reports.docs.map(toRecord).sort(sortBy("date", "desc"));
+      state.teamChecklists = teamChecklists.docs.map(toRecord);
 
-  await loadChecklist();
-  renderAll();
+      await loadChecklist();
+      renderAll();
+    });
+    setGlobalMessage("Data synced.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function buildScopedQuery(name, scopeField) {
@@ -650,40 +672,47 @@ function renderLeadCard(lead) {
 
 async function saveLead(event) {
   event.preventDefault();
-  const id = $("leadId").value;
-  const assignedManagerId = isOwner() ? $("leadAssignedManager").value : state.user.uid;
-  const assignedManagerName = userName(assignedManagerId);
-  const payload = {
-    companyName: $("leadCompanyName").value.trim(),
-    contactName: $("leadContactName").value.trim(),
-    phone: $("leadPhone").value.trim(),
-    email: $("leadEmail").value.trim(),
-    city: $("leadCity").value.trim(),
-    category: $("leadCategory").value,
-    source: $("leadSource").value,
-    status: normalizeStatus($("leadStatus").value),
-    assignedManagerId,
-    assignedManagerName,
-    nextFollowUpDate: $("leadNextFollowUpDate").value,
-    notes: $("leadNotes").value.trim(),
-    ownerId: assignedManagerId,
-    ownerName: assignedManagerName,
-    updatedDate: today(),
-    updatedAt: serverTimestamp()
-  };
+  try {
+    await withLoading("Saving lead...", async () => {
+      const id = $("leadId").value;
+      const assignedManagerId = isOwner() ? $("leadAssignedManager").value : state.user.uid;
+      const assignedManagerName = userName(assignedManagerId);
+      const payload = {
+        companyName: $("leadCompanyName").value.trim(),
+        contactName: $("leadContactName").value.trim(),
+        phone: $("leadPhone").value.trim(),
+        email: $("leadEmail").value.trim(),
+        city: $("leadCity").value.trim(),
+        category: $("leadCategory").value,
+        source: $("leadSource").value,
+        status: normalizeStatus($("leadStatus").value),
+        assignedManagerId,
+        assignedManagerName,
+        nextFollowUpDate: $("leadNextFollowUpDate").value,
+        notes: $("leadNotes").value.trim(),
+        ownerId: assignedManagerId,
+        ownerName: assignedManagerName,
+        updatedDate: today(),
+        updatedAt: serverTimestamp()
+      };
 
-  if (id) {
-    await updateDoc(doc(db, "leads", id), payload);
-  } else {
-    await addDoc(collection(db, "leads"), {
-      ...payload,
-      createdDate: today(),
-      createdAt: serverTimestamp()
+      if (id) {
+        await updateDoc(doc(db, "leads", id), payload);
+      } else {
+        await addDoc(collection(db, "leads"), {
+          ...payload,
+          createdDate: today(),
+          createdAt: serverTimestamp()
+        });
+      }
+
+      clearLeadForm();
+      await loadData();
     });
+    setGlobalMessage("Lead saved.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
   }
-
-  clearLeadForm();
-  await loadData();
 }
 
 function editLead(id) {
@@ -706,8 +735,15 @@ function editLead(id) {
 
 async function deleteLead(id) {
   if (!confirm("Delete this lead?")) return;
-  await deleteDoc(doc(db, "leads", id));
-  await loadData();
+  try {
+    await withLoading("Deleting lead...", async () => {
+      await deleteDoc(doc(db, "leads", id));
+      await loadData();
+    });
+    setGlobalMessage("Lead deleted.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function clearLeadForm() {
@@ -986,35 +1022,42 @@ async function markLeadContacted(id) {
   const lead = state.leads.find((item) => item.id === id);
   if (!lead) return;
 
-  const noteField = document.querySelector(`[data-queue-note="${id}"]`);
-  const nextDateField = document.querySelector(`[data-queue-next-date="${id}"]`);
-  const note = noteField?.value.trim() || "Follow-up completed.";
-  const nextFollowUpDate = nextDateField?.value || addDays(today(), 3);
-  const existingNotes = lead.notes ? `${lead.notes}\n\n` : "";
-  const updatedNotes = `${existingNotes}[${today()}] Follow-up: ${note}`;
+  try {
+    await withLoading("Updating follow-up...", async () => {
+      const noteField = document.querySelector(`[data-queue-note="${id}"]`);
+      const nextDateField = document.querySelector(`[data-queue-next-date="${id}"]`);
+      const note = noteField?.value.trim() || "Follow-up completed.";
+      const nextFollowUpDate = nextDateField?.value || addDays(today(), 3);
+      const existingNotes = lead.notes ? `${lead.notes}\n\n` : "";
+      const updatedNotes = `${existingNotes}[${today()}] Follow-up: ${note}`;
 
-  await updateDoc(doc(db, "leads", id), {
-    status: "contacted",
-    notes: updatedNotes,
-    nextFollowUpDate,
-    updatedDate: today(),
-    updatedAt: serverTimestamp()
-  });
+      await updateDoc(doc(db, "leads", id), {
+        status: "contacted",
+        notes: updatedNotes,
+        nextFollowUpDate,
+        updatedDate: today(),
+        updatedAt: serverTimestamp()
+      });
 
-  await addDoc(collection(db, "followUps"), {
-    leadId: id,
-    dueDate: today(),
-    type: "follow_up_queue",
-    status: "done",
-    notes: note,
-    ownerId: lead.ownerId,
-    ownerName: lead.ownerName || userName(lead.ownerId),
-    completedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
+      await addDoc(collection(db, "followUps"), {
+        leadId: id,
+        dueDate: today(),
+        type: "follow_up_queue",
+        status: "done",
+        notes: note,
+        ownerId: lead.ownerId,
+        ownerName: lead.ownerName || userName(lead.ownerId),
+        completedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
 
-  await loadData();
+      await loadData();
+    });
+    setGlobalMessage("Follow-up completed.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function renderFollowUpCard(item) {
@@ -1044,26 +1087,33 @@ function renderFollowUpCard(item) {
 
 async function saveFollowUp(event) {
   event.preventDefault();
-  const id = $("followUpId").value;
-  const payload = {
-    leadId: $("followUpLead").value,
-    dueDate: $("followUpDate").value,
-    type: $("followUpType").value,
-    status: $("followUpStatus").value,
-    notes: $("followUpNotes").value.trim(),
-    ownerId: state.user.uid,
-    ownerName: state.profile.displayName || state.user.email,
-    updatedAt: serverTimestamp()
-  };
+  try {
+    await withLoading("Saving follow-up...", async () => {
+      const id = $("followUpId").value;
+      const payload = {
+        leadId: $("followUpLead").value,
+        dueDate: $("followUpDate").value,
+        type: $("followUpType").value,
+        status: $("followUpStatus").value,
+        notes: $("followUpNotes").value.trim(),
+        ownerId: state.user.uid,
+        ownerName: state.profile.displayName || state.user.email,
+        updatedAt: serverTimestamp()
+      };
 
-  if (id) {
-    await updateDoc(doc(db, "followUps", id), payload);
-  } else {
-    await addDoc(collection(db, "followUps"), { ...payload, createdAt: serverTimestamp() });
+      if (id) {
+        await updateDoc(doc(db, "followUps", id), payload);
+      } else {
+        await addDoc(collection(db, "followUps"), { ...payload, createdAt: serverTimestamp() });
+      }
+
+      clearFollowUpForm();
+      await loadData();
+    });
+    setGlobalMessage("Follow-up saved.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
   }
-
-  clearFollowUpForm();
-  await loadData();
 }
 
 function editFollowUp(id) {
@@ -1078,18 +1128,32 @@ function editFollowUp(id) {
 }
 
 async function completeFollowUp(id) {
-  await updateDoc(doc(db, "followUps", id), {
-    status: "done",
-    completedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-  await loadData();
+  try {
+    await withLoading("Completing follow-up...", async () => {
+      await updateDoc(doc(db, "followUps", id), {
+        status: "done",
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      await loadData();
+    });
+    setGlobalMessage("Follow-up marked done.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 async function deleteFollowUp(id) {
   if (!confirm("Delete this follow-up?")) return;
-  await deleteDoc(doc(db, "followUps", id));
-  await loadData();
+  try {
+    await withLoading("Deleting follow-up...", async () => {
+      await deleteDoc(doc(db, "followUps", id));
+      await loadData();
+    });
+    setGlobalMessage("Follow-up deleted.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function clearFollowUpForm() {
@@ -1099,24 +1163,32 @@ function clearFollowUpForm() {
 }
 
 async function saveChecklist() {
-  const goals = {};
-  document.querySelectorAll("[data-goal-key]").forEach((field) => {
-    goals[field.dataset.goalKey] = field.type === "checkbox" ? field.checked : Number(field.value || 0);
-  });
-  const progress = calculateChecklistProgress(goals);
+  try {
+    await withLoading("Saving checklist...", async () => {
+      const goals = {};
+      document.querySelectorAll("[data-goal-key]").forEach((field) => {
+        goals[field.dataset.goalKey] = field.type === "checkbox" ? field.checked : Number(field.value || 0);
+      });
+      const progress = calculateChecklistProgress(goals);
 
-  await setDoc(doc(db, "dailyChecklists", `${state.user.uid}_${today()}`), {
-    ownerId: state.user.uid,
-    ownerName: state.profile.displayName || state.user.email,
-    date: today(),
-    goals,
-    progress,
-    updatedAt: serverTimestamp()
-  });
-  state.checklist = { goals, progress };
-  setMessage($("checklistMessage"), "Checklist saved.");
-  renderChecklist();
-  await loadData();
+      await setDoc(doc(db, "dailyChecklists", `${state.user.uid}_${today()}`), {
+        ownerId: state.user.uid,
+        ownerName: state.profile.displayName || state.user.email,
+        date: today(),
+        goals,
+        progress,
+        updatedAt: serverTimestamp()
+      });
+      state.checklist = { goals, progress };
+      setMessage($("checklistMessage"), "Checklist saved.");
+      renderChecklist();
+      await loadData();
+    });
+    setGlobalMessage("Checklist saved.");
+  } catch (error) {
+    setMessage($("checklistMessage"), cleanError(error), true);
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function renderChecklist() {
@@ -1135,28 +1207,35 @@ function renderChecklist() {
 
 async function saveReport(event) {
   event.preventDefault();
-  const date = $("reportDate").value;
-  const reportId = `${state.user.uid}_${date}`;
-  await setDoc(doc(db, "dailyReports", reportId), {
-    ownerId: state.user.uid,
-    ownerName: state.profile.displayName || state.user.email,
-    date,
-    newLeads: Number($("reportNewLeads").value || 0),
-    newOutreaches: Number($("reportNewOutreaches").value || 0),
-    followUpsCompleted: Number($("reportFollowUpsCompleted").value || 0),
-    callsMade: Number($("reportCallsMade").value || 0),
-    messagesSent: Number($("reportMessagesSent").value || 0),
-    proposalsSent: Number($("reportProposalsSent").value || 0),
-    responsesReceived: Number($("reportResponsesReceived").value || 0),
-    meetingsBooked: Number($("reportMeetingsBooked").value || 0),
-    dealsClosed: Number($("reportDealsClosed").value || 0),
-    problems: $("reportProblems").value.trim(),
-    tomorrow: $("reportTomorrow").value.trim(),
-    updatedAt: serverTimestamp()
-  });
-  els.reportForm.reset();
-  $("reportDate").value = today();
-  await loadData();
+  try {
+    await withLoading("Submitting report...", async () => {
+      const date = $("reportDate").value;
+      const reportId = `${state.user.uid}_${date}`;
+      await setDoc(doc(db, "dailyReports", reportId), {
+        ownerId: state.user.uid,
+        ownerName: state.profile.displayName || state.user.email,
+        date,
+        newLeads: Number($("reportNewLeads").value || 0),
+        newOutreaches: Number($("reportNewOutreaches").value || 0),
+        followUpsCompleted: Number($("reportFollowUpsCompleted").value || 0),
+        callsMade: Number($("reportCallsMade").value || 0),
+        messagesSent: Number($("reportMessagesSent").value || 0),
+        proposalsSent: Number($("reportProposalsSent").value || 0),
+        responsesReceived: Number($("reportResponsesReceived").value || 0),
+        meetingsBooked: Number($("reportMeetingsBooked").value || 0),
+        dealsClosed: Number($("reportDealsClosed").value || 0),
+        problems: $("reportProblems").value.trim(),
+        tomorrow: $("reportTomorrow").value.trim(),
+        updatedAt: serverTimestamp()
+      });
+      els.reportForm.reset();
+      $("reportDate").value = today();
+      await loadData();
+    });
+    setGlobalMessage("Daily report submitted.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function renderReports() {
@@ -1329,35 +1408,56 @@ function renderAdminReports() {
 }
 
 async function updateUserRole(uid, role) {
-  await updateDoc(doc(db, "users", uid), {
-    role,
-    updatedAt: serverTimestamp()
-  });
-  await loadData();
+  try {
+    await withLoading("Updating user role...", async () => {
+      await updateDoc(doc(db, "users", uid), {
+        role,
+        updatedAt: serverTimestamp()
+      });
+      await loadData();
+    });
+    setGlobalMessage("User role updated.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 async function toggleUserDisabled(uid) {
   const user = state.users.find((item) => item.uid === uid);
   if (!user) return;
-  await updateDoc(doc(db, "users", uid), {
-    disabled: !user.disabled,
-    updatedAt: serverTimestamp()
-  });
-  await loadData();
+  try {
+    await withLoading(user.disabled ? "Enabling user..." : "Disabling user...", async () => {
+      await updateDoc(doc(db, "users", uid), {
+        disabled: !user.disabled,
+        updatedAt: serverTimestamp()
+      });
+      await loadData();
+    });
+    setGlobalMessage(user.disabled ? "User enabled." : "User disabled.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 async function assignLeadToManager(leadId, managerId) {
   const manager = getManagerOptions().find((user) => user.uid === managerId);
   if (!manager) return;
-  await updateDoc(doc(db, "leads", leadId), {
-    ownerId: manager.uid,
-    ownerName: manager.displayName || manager.email,
-    assignedManagerId: manager.uid,
-    assignedManagerName: manager.displayName || manager.email,
-    updatedDate: today(),
-    updatedAt: serverTimestamp()
-  });
-  await loadData();
+  try {
+    await withLoading("Assigning lead...", async () => {
+      await updateDoc(doc(db, "leads", leadId), {
+        ownerId: manager.uid,
+        ownerName: manager.displayName || manager.email,
+        assignedManagerId: manager.uid,
+        assignedManagerName: manager.displayName || manager.email,
+        updatedDate: today(),
+        updatedAt: serverTimestamp()
+      });
+      await loadData();
+    });
+    setGlobalMessage("Lead assigned.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function showSection(sectionId) {
@@ -1397,9 +1497,157 @@ function roleForEmail(email) {
   return OWNER_EMAILS.map(normalizeEmail).includes(normalizeEmail(email)) ? "owner" : "sales_manager";
 }
 
+async function exportCsv(type) {
+  try {
+    await withLoading("Preparing CSV export...", async () => {
+      const rows = await getExportRows(type);
+      if (!rows.length) {
+        setGlobalMessage(`No ${type} records to export.`);
+        return;
+      }
+
+      const csv = toCsv(rows);
+      const filename = `company-sales-hub-${type}-${today()}.csv`;
+      downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+      setGlobalMessage(`${filename} exported.`);
+    });
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
+}
+
+async function getExportRows(type) {
+  if (type === "leads") return state.leads.map(exportLeadRow);
+  if (type === "reports") return state.reports.map(exportReportRow);
+  if (type === "followUps") return state.followUps.map(exportFollowUpRow);
+  if (type === "checklists") {
+    const scope = isOwner() ? query(collection(db, "dailyChecklists")) : query(collection(db, "dailyChecklists"), where("ownerId", "==", state.user.uid));
+    const snap = await getDocs(scope);
+    return snap.docs.map(toRecord).map(exportChecklistRow);
+  }
+  return [];
+}
+
+function exportLeadRow(lead) {
+  return {
+    id: lead.id,
+    companyName: lead.companyName || lead.name || "",
+    contactName: lead.contactName || "",
+    phone: lead.phone || "",
+    email: lead.email || "",
+    city: lead.city || "",
+    category: labelValue(lead.category || ""),
+    source: labelValue(lead.source || ""),
+    status: statusLabel(lead.status),
+    assignedManager: userName(lead.ownerId),
+    nextFollowUpDate: lead.nextFollowUpDate || "",
+    notes: lead.notes || "",
+    createdDate: lead.createdDate || formatDateTime(lead.createdAt),
+    updatedDate: lead.updatedDate || formatDateTime(lead.updatedAt)
+  };
+}
+
+function exportReportRow(report) {
+  const normalizedReport = normalizeReport(report);
+  return {
+    id: report.id,
+    date: report.date || "",
+    manager: userName(report.ownerId),
+    newLeads: normalizedReport.newLeads,
+    newOutreaches: normalizedReport.newOutreaches,
+    followUpsCompleted: normalizedReport.followUpsCompleted,
+    callsMade: normalizedReport.callsMade,
+    messagesSent: normalizedReport.messagesSent,
+    proposalsSent: normalizedReport.proposalsSent,
+    responsesReceived: normalizedReport.responsesReceived,
+    meetingsBooked: normalizedReport.meetingsBooked,
+    dealsClosed: normalizedReport.dealsClosed,
+    problems: report.problems || "",
+    tomorrow: report.tomorrow || ""
+  };
+}
+
+function exportFollowUpRow(followUp) {
+  return {
+    id: followUp.id,
+    lead: leadName(followUp.leadId),
+    dueDate: followUp.dueDate || "",
+    type: followUp.type || "",
+    status: followUp.status || "",
+    manager: userName(followUp.ownerId),
+    notes: followUp.notes || "",
+    createdAt: formatDateTime(followUp.createdAt),
+    updatedAt: formatDateTime(followUp.updatedAt)
+  };
+}
+
+function exportChecklistRow(checklist) {
+  const goals = checklist.goals || {};
+  return {
+    id: checklist.id,
+    date: checklist.date || "",
+    manager: userName(checklist.ownerId),
+    newCrmContacts: goals.newCrmContacts || 0,
+    newOutreaches: goals.newOutreaches || 0,
+    followUps: goals.followUps || 0,
+    facebookGroupsReviewed: goals.facebookGroupsReviewed || 0,
+    relevantPostsFound: goals.relevantPostsFound || 0,
+    dailyReportSubmitted: Boolean(goals.dailyReportSubmitted),
+    progressPercent: checklist.progress?.percent ?? calculateChecklistProgress(goals).percent,
+    updatedAt: formatDateTime(checklist.updatedAt)
+  };
+}
+
+function toCsv(rows) {
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(","))
+  ];
+  return lines.join("\n");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "").replace(/\r?\n/g, " ");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadTextFile(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function setMessage(element, text, isError = false) {
   element.textContent = text;
   element.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+function setGlobalMessage(text, isError = false) {
+  if (!els.globalMessage) return;
+  setMessage(els.globalMessage, text, isError);
+}
+
+async function withLoading(text, action) {
+  setLoading(true, text);
+  try {
+    return await action();
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(isLoading, text = "Loading...") {
+  if (!els.loadingOverlay) return;
+  els.loadingText.textContent = text;
+  els.loadingOverlay.classList.toggle("hidden", !isLoading);
+  document.body.classList.toggle("is-loading", isLoading);
 }
 
 function cleanError(error) {

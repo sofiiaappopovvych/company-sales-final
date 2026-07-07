@@ -1,180 +1,132 @@
-# Company Sales Hub CRM v2.0 Security Review
+# Company Sales Hub v1.0
 
-Simple internal web app for owner and sales managers.
+Production-ready internal sales CRM for owner and sales managers.
 
-## What is included
+Built for GitHub Pages with plain HTML, CSS, JavaScript, Firebase Authentication, and Firestore. No React, no npm, no build step.
 
-- Firebase email/password login and registration
+## File Structure
+
+```text
+company-sales-hub/
+├── index.html
+├── styles.css
+├── app.js
+├── firebase-config.js
+├── app-config.js
+├── firestore.rules
+├── README.md
+└── docs/
+    ├── firebase-setup.md
+    ├── github-pages.md
+    └── testing-checklist.md
+```
+
+## Features
+
+- Public GitHub Pages website with private Firebase-protected data
+- Email/password login and registration
+- Approved-user allowlist in `app-config.js` and `firestore.rules`
 - Roles: `owner` and `sales_manager`
-- CRM leads v1.1 with company/contact fields, assigned manager, dates, search, and filters
-- Sales pipeline statuses: New Lead, Contacted, Interested, Follow-up, Proposal Sent, Won, Lost
-- Visual sales funnel with counters for every status
-- Daily checklist
-- Daily Sales Checklist with measurable goals saved by date and user
-- Owner can see today's checklist progress for all managers
-- Daily Report form with sales activity metrics
-- Owner can see all manager reports
-- Follow-up Queue for leads due today or overdue
-- Mark queued leads as contacted, add follow-up note, and update the next follow-up date
-- Searchable Sales Playbook knowledge base in English and Russian
-- Templates section with copy buttons
-- Owner-only Admin Panel for users, roles, lead assignment, manager KPI, disabled users, and all daily reports
-- KPI Dashboard with today/week/month metrics and manager leaderboard
-- Private access allowlist with owner emails and approved manager emails
+- Owner email allowlist
+- Owner sees all data; managers see only their own data
+- CRM leads with search, filters, add/edit/delete, manager assignment, and next follow-up date
+- Sales pipeline statuses and visual funnel counters
+- Follow-up queue for today and overdue leads
+- Daily sales checklist saved by date and user
+- Daily reports by manager
+- Owner dashboard, Admin Panel, and KPI Dashboard
+- Searchable Sales Playbook in English and Russian
+- Message templates with copy buttons
+- CSV backup/export for leads, reports, follow-ups, and checklists
+- Mobile-friendly responsive layout
+- Loading states and user-facing error messages
 
-## KPI Dashboard
+## Setup Steps
 
-- Leads added today/week/month
-- Follow-ups today/week/month
-- Messages sent
-- Calls made
-- Proposals sent
-- Meetings booked
-- Deals won
-- Conversion rate
-- Leaderboard managers
+1. Create a Firebase project.
+2. Enable Firebase Authentication with Email/Password.
+3. Create a Firestore database.
+4. Add a Firebase Web App and copy the config into `firebase-config.js`.
+5. Add owner and approved manager emails to `app-config.js`.
+6. Add the same emails to `firestore.rules`.
+7. Publish `firestore.rules` in Firebase Console.
+8. Upload all project files to GitHub.
+9. Enable GitHub Pages for the repository.
+10. Add the GitHub Pages domain to Firebase Authentication authorized domains.
+11. Register the owner account with an email listed in `OWNER_EMAILS`.
+12. Test with one owner and one manager before giving access to the full team.
 
-## Admin Panel
+## Required Config
 
-- View all users
-- Change user roles
-- Disable or enable users
-- Assign leads to managers
-- View manager KPI
-- View all daily reports
-- Follow-up tracker
-- Daily reports
-- Owner dashboard
-- Shared Firestore sync between users
-- Sales managers see their own data
-- Owner sees all team data
-- Works on GitHub Pages with plain HTML/CSS/JavaScript
+### `firebase-config.js`
 
-## Lead fields
+Paste the Firebase Web App config from Firebase Console:
 
-- Company name
-- Contact name
-- Phone
-- Email
-- City
-- Category
-- Source
-- Status
-- Assigned manager
-- Next follow-up date
-- Notes
-- Created date
-- Updated date
+```js
+export const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+```
 
-## CRM functions
+### `app-config.js`
 
-- Add lead
-- Edit lead
-- Delete lead
-- Search leads
-- Filter by status
-- Filter by source
-- Filter by category
-- Filter by manager for owner
-- Visual funnel and status counters
+Add all emails in lowercase:
 
-## Daily Sales Checklist goals
+```js
+export const OWNER_EMAILS = [
+  "owner@example.com"
+];
 
-- 20 new CRM contacts
-- 15-20 new outreaches
-- 30 follow-ups
-- 20-30 Facebook groups reviewed
-- 10-15 relevant posts found
-- Daily report submitted
+export const APPROVED_MANAGER_EMAILS = [
+  "manager@example.com"
+];
+```
 
-## Daily Report fields
+Important: every approved email must also be listed inside `firestore.rules`.
 
-- New leads added
-- New outreaches
-- Follow-ups completed
-- Calls made
-- Messages sent
-- Proposals sent
-- Responses received
-- Meetings booked
-- Deals closed
-- Problems / objections
-- Tomorrow plan
+## Security Model
 
-## Sales Playbook sections
+- The website itself is public because GitHub Pages is public.
+- Business data is private because Firestore reads/writes require Firebase login.
+- Only approved emails can create/read/write app data.
+- Owner access requires both:
+  - `role: "owner"` in the user profile
+  - the email listed in owner allowlists
+- Sales managers can read/write only documents where `ownerId` equals their Firebase UID.
+- Disabled users are blocked by the app and by Firestore rules.
 
-- Company overview
-- Services
-- Target audiences
-- Facebook strategy
-- Instagram strategy
-- Grand opening strategy
-- Schools/daycares/churches
-- Objection handling
-- Closing
-- SOP
+Static GitHub Pages cannot fully prevent someone from creating a Firebase Auth account outside the UI. Firestore Rules are the real protection: unapproved accounts cannot access company data.
 
-## Template categories
+## CSV Backup / Export
 
-- Facebook group reply
-- Facebook DM
-- Instagram DM
-- Email
-- SMS
-- Phone scripts
-- Follow-up messages
-- Objection responses
+After login, open Dashboard and use:
 
-## Files
+- Export leads CSV
+- Export reports CSV
+- Export follow-ups CSV
+- Export checklists CSV
 
-- `index.html` - app layout
-- `styles.css` - responsive design
-- `app.js` - Firebase auth, Firestore sync, CRM logic
-- `firebase-config.js` - paste your Firebase config here
-- `app-config.js` - owner emails and approved manager emails
-- `firestore.rules` - Firestore security rules
+Owner exports team-wide data. Managers export only their own accessible data.
 
-## Privacy and security setup
+## Guides
 
-This app can be publicly hosted on GitHub Pages, but company data is protected by Firebase Authentication and Firestore Security Rules.
+- Firebase setup: `docs/firebase-setup.md`
+- GitHub Pages setup: `docs/github-pages.md`
+- Testing checklist: `docs/testing-checklist.md`
 
-Before using with the team:
+## Deployment Checklist
 
-1. Add owner emails to `app-config.js`.
-2. Add approved manager emails to `app-config.js`.
-3. Add the same emails to `firestore.rules` inside `ownerEmails()` and `approvedUserEmails()`.
-4. Publish `firestore.rules` in Firebase Console.
-5. Keep Email/Password Authentication enabled.
-6. Keep `sofiiaappopovych.github.io` in Firebase Authorized domains.
-
-Important: client-side config improves the app experience, but Firestore Rules are the real data protection layer. Always update both.
-
-## Firebase setup
-
-1. Open Firebase Console and create a project.
-2. Add a Web App.
-3. Copy the web config into `firebase-config.js`.
-4. Go to Authentication -> Sign-in method.
-5. Enable Email/Password.
-6. Go to Firestore Database and create a database.
-7. Publish the rules from `firestore.rules`.
-
-## GitHub Pages setup
-
-1. Upload all files to your GitHub repository.
-2. Go to repository Settings -> Pages.
-3. Select the branch and folder where these files are stored.
-4. Open the GitHub Pages URL.
-
-## Important role note
-
-During MVP registration, users can choose `owner` or `sales_manager`.
-
-For a private company tool, the safer next step is to let only the real owner assign roles in Firebase/Firestore. For now, this is kept simple so you can start testing immediately.
-
-## First test
-
-1. Register an owner account.
-2. Register one sales manager account in another browser or private window.
-3. Add leads and reports as sales manager.
-4. Login as owner and confirm that the dashboard shows all users' data.
+- `firebase-config.js` contains the correct Firebase project config.
+- `app-config.js` contains real owner and manager emails.
+- `firestore.rules` contains the same approved emails.
+- Firestore rules are published.
+- Email/Password Auth is enabled.
+- GitHub Pages domain is authorized in Firebase Auth.
+- Owner account is registered first.
+- Manager account is tested in a separate browser or private window.
+- CSV export buttons are tested after sample data is added.
