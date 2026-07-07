@@ -19,6 +19,7 @@ service cloud.firestore {
     function approvedUserEmails() {
       return [
         "skillfulsweing@gmail.com"
+        "snek.sova@gmail.com"
       ];
     }
 
