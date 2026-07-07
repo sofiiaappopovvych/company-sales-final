@@ -2257,6 +2257,9 @@ function showSection(sectionId) {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.classList.toggle("active", button.dataset.section === sectionId);
   });
+  const activeButton = document.querySelector(`.nav-btn[data-section="${sectionId}"]`);
+  const activeSection = activeButton?.closest(".nav-section");
+  if (activeSection) activeSection.open = true;
   const navMenu = document.querySelector(".nav-menu");
   if (navMenu && window.matchMedia("(max-width: 860px)").matches) {
     navMenu.open = false;

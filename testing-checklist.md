@@ -137,8 +137,9 @@
 
 ## Navigation
 
-- Desktop navigation appears as a grouped sidebar.
+- Desktop navigation appears as a grouped accordion sidebar.
 - Sections are grouped into Overview, CRM & Bookings, Daily Work, Resources, and Owner.
+- Navigation groups can be opened and closed.
 - Owner/Admin links appear only for owner users.
 - Active section is highlighted.
 

@@ -267,26 +267,59 @@ textarea {
 
 .nav-menu {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
-.nav-menu summary {
+.nav-menu > summary {
   display: none;
+}
+
+.nav-section {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.nav-section:last-child {
+  border-bottom: 0;
+}
+
+.nav-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  list-style: none;
+  padding: 6px 2px;
+  text-transform: uppercase;
+}
+
+.nav-section > summary::-webkit-details-marker,
+.nav-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-section > summary::after {
+  content: "+";
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.nav-section[open] > summary::after {
+  content: "-";
 }
 
 .nav-group {
   display: grid;
   gap: 8px;
-  margin-bottom: 18px;
-}
-
-.nav-group p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  padding-top: 2px;
 }
 
 .nav-btn {
@@ -1050,7 +1083,7 @@ main {
     gap: 12px;
   }
 
-  .nav-menu summary {
+  .nav-menu > summary {
     min-height: 42px;
     display: flex;
     align-items: center;
@@ -1064,7 +1097,7 @@ main {
     font-weight: 800;
   }
 
-  .nav-menu summary::after {
+  .nav-menu > summary::after {
     content: "Open";
     color: var(--muted);
     font-size: 12px;
@@ -1072,12 +1105,20 @@ main {
     text-transform: uppercase;
   }
 
-  .nav-menu[open] summary::after {
+  .nav-menu[open] > summary::after {
     content: "Close";
   }
 
+  .nav-section > summary::after {
+    content: "+";
+  }
+
+  .nav-section[open] > summary::after {
+    content: "-";
+  }
+
   .nav-group {
-    margin-bottom: 10px;
+    margin-bottom: 4px;
   }
 
   .nav-btn {

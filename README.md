@@ -42,7 +42,7 @@ company-sales-hub/
 - Message templates with copy buttons
 - CSV backup/export for leads, reports, follow-ups, and checklists
 - Mobile-friendly responsive layout
-- Grouped sidebar navigation on desktop and collapsible menu navigation on mobile
+- Collapsible grouped sidebar navigation on desktop and accordion menu navigation on mobile
 - Loading states and user-facing error messages
 - Dates display as `MM/DD/YYYY`
 
