@@ -1975,10 +1975,13 @@ function renderReports() {
   $("reportsList").innerHTML = state.reports.length
     ? state.reports.map(renderReportCard).join("")
     : `<article class="record-card"><p class="muted">No reports yet.</p></article>`;
+
+  bindReportActions();
 }
 
 function renderReportCard(report) {
   const normalizedReport = normalizeReport(report);
+  const canDelete = isOwner() || report.ownerId === state.user?.uid;
   return `
     <article class="record-card">
       <div class="record-header">
@@ -1997,11 +2000,44 @@ function renderReportCard(report) {
             ${isOwner() ? `<span>${escapeHtml(userName(report.ownerId))}</span>` : ""}
           </div>
         </div>
+        ${canDelete ? `
+          <div class="record-actions">
+            <button data-delete-report="${report.id}" class="danger" type="button">Delete</button>
+          </div>
+        ` : ""}
       </div>
       <p><strong>Problems / objections:</strong> ${escapeHtml(normalizedReport.problems || "-")}</p>
       <p><strong>Tomorrow:</strong> ${escapeHtml(report.tomorrow || "-")}</p>
     </article>
   `;
+}
+
+function bindReportActions() {
+  document.querySelectorAll("[data-delete-report]").forEach((button) => {
+    if (button.dataset.boundDeleteReport) return;
+    button.dataset.boundDeleteReport = "true";
+    button.addEventListener("click", () => deleteReport(button.dataset.deleteReport));
+  });
+}
+
+async function deleteReport(id) {
+  const report = state.reports.find((item) => item.id === id);
+  if (!report) return;
+  if (!isOwner() && report.ownerId !== state.user?.uid) {
+    setGlobalMessage("You can delete only your own reports.", true);
+    return;
+  }
+  if (!confirm(`Delete report for ${formatDisplayDate(report.date)}?`)) return;
+
+  try {
+    await withLoading("Deleting report...", async () => {
+      await deleteDoc(doc(db, "dailyReports", id));
+      await loadData();
+    });
+    setGlobalMessage("Daily report deleted.");
+  } catch (error) {
+    setGlobalMessage(cleanError(error), true);
+  }
 }
 
 function renderOwnerDashboard() {
@@ -2147,6 +2183,7 @@ function renderAdminReports() {
   $("adminReportsList").innerHTML = sortedReports.length
     ? sortedReports.map((report) => renderReportCard(report)).join("")
     : `<p class="muted">No daily reports yet.</p>`;
+  bindReportActions();
 }
 
 async function updateUserRole(uid, role) {
@@ -2220,6 +2257,10 @@ function showSection(sectionId) {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.classList.toggle("active", button.dataset.section === sectionId);
   });
+  const navMenu = document.querySelector(".nav-menu");
+  if (navMenu && window.matchMedia("(max-width: 860px)").matches) {
+    navMenu.open = false;
+  }
 }
 
 function userName(uid) {
@@ -2493,6 +2534,7 @@ function renderOwnerReports() {
   $("ownerReportsList").innerHTML = sortedReports.length
     ? sortedReports.map((report) => renderReportCard(report)).join("")
     : `<article class="record-card"><p class="muted">No manager reports yet.</p></article>`;
+  bindReportActions();
 }
 
 function leadTitle(lead) {

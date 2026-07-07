@@ -103,6 +103,8 @@
 
 - Submit daily report.
 - Report appears in Daily Reports.
+- Manager can delete own report.
+- Owner can delete manager reports.
 - Owner sees all manager reports.
 - KPI dashboard updates from report numbers.
 
@@ -128,9 +130,17 @@
 
 - Open site on phone width.
 - Login card fits screen.
-- Navigation scrolls horizontally.
+- Navigation appears as a collapsible menu.
+- Selecting a menu item closes the menu on mobile.
 - Forms stack into one column.
 - Record action buttons are tappable.
+
+## Navigation
+
+- Desktop navigation appears as a grouped sidebar.
+- Sections are grouped into Overview, CRM & Bookings, Daily Work, Resources, and Owner.
+- Owner/Admin links appear only for owner users.
+- Active section is highlighted.
 
 ## Deployment
 

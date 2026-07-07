@@ -60,22 +60,41 @@
           </div>
         </header>
 
-        <nav class="main-nav" aria-label="Main sections">
-          <button class="nav-btn active" data-section="dashboardSection" type="button">Dashboard</button>
-          <button class="nav-btn" data-section="kpiSection" type="button">KPI Dashboard</button>
-          <button class="nav-btn" data-section="leadsSection" type="button">CRM Leads</button>
-          <button class="nav-btn" data-section="calendarSection" type="button">Booking Calendar</button>
-          <button class="nav-btn" data-section="availabilitySection" type="button">Character Availability</button>
-          <button class="nav-btn" data-section="checklistSection" type="button">Daily Checklist</button>
-          <button class="nav-btn" data-section="followUpsSection" type="button">Follow-up</button>
-          <button class="nav-btn" data-section="reportsSection" type="button">Daily Reports</button>
-          <button class="nav-btn" data-section="playbookSection" type="button">Sales Playbook</button>
-          <button class="nav-btn" data-section="templatesSection" type="button">Templates</button>
-          <button id="adminNavBtn" class="nav-btn hidden" data-section="adminSection" type="button">Admin Panel</button>
-          <button id="ownerNavBtn" class="nav-btn hidden" data-section="ownerSection" type="button">Owner Dashboard</button>
-        </nav>
+        <div class="app-shell">
+          <nav class="main-nav" aria-label="Main sections">
+            <details class="nav-menu" open>
+              <summary>Menu</summary>
+              <div class="nav-group">
+                <p>Overview</p>
+                <button class="nav-btn active" data-section="dashboardSection" type="button">Dashboard</button>
+                <button class="nav-btn" data-section="kpiSection" type="button">KPI Dashboard</button>
+              </div>
+              <div class="nav-group">
+                <p>CRM & Bookings</p>
+                <button class="nav-btn" data-section="leadsSection" type="button">CRM Leads</button>
+                <button class="nav-btn" data-section="calendarSection" type="button">Booking Calendar</button>
+                <button class="nav-btn" data-section="availabilitySection" type="button">Character Availability</button>
+              </div>
+              <div class="nav-group">
+                <p>Daily Work</p>
+                <button class="nav-btn" data-section="checklistSection" type="button">Daily Checklist</button>
+                <button class="nav-btn" data-section="followUpsSection" type="button">Follow-up</button>
+                <button class="nav-btn" data-section="reportsSection" type="button">Daily Reports</button>
+              </div>
+              <div class="nav-group">
+                <p>Resources</p>
+                <button class="nav-btn" data-section="playbookSection" type="button">Sales Playbook</button>
+                <button class="nav-btn" data-section="templatesSection" type="button">Templates</button>
+              </div>
+              <div class="nav-group owner-nav-group">
+                <p>Owner</p>
+                <button id="ownerNavBtn" class="nav-btn hidden" data-section="ownerSection" type="button">Owner Dashboard</button>
+                <button id="adminNavBtn" class="nav-btn hidden" data-section="adminSection" type="button">Admin Panel</button>
+              </div>
+            </details>
+          </nav>
 
-        <main>
+          <main>
           <p id="globalMessage" class="message global-message" role="status"></p>
           <section id="dashboardSection" class="page-section">
             <div class="section-heading">
@@ -817,7 +836,8 @@
               <div id="adminReportsList" class="records compact"></div>
             </article>
           </section>
-        </main>
+          </main>
+        </div>
       </section>
     </div>
 

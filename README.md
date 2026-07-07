@@ -36,12 +36,13 @@ company-sales-hub/
 - Sales pipeline statuses and visual funnel counters
 - Follow-up queue for today and overdue leads
 - Daily sales checklist saved by date and user
-- Daily reports by manager
+- Daily reports by manager with delete option
 - Owner dashboard, Admin Panel, and KPI Dashboard
 - Searchable Sales Playbook in English and Russian
 - Message templates with copy buttons
 - CSV backup/export for leads, reports, follow-ups, and checklists
 - Mobile-friendly responsive layout
+- Grouped sidebar navigation on desktop and collapsible menu navigation on mobile
 - Loading states and user-facing error messages
 - Dates display as `MM/DD/YYYY`
 
