@@ -108,5 +108,10 @@ service cloud.firestore {
       allow read: if isOwner() || ownsExisting();
       allow delete: if isOwner() || ownsExisting();
     }
+
+    match /resourcePages/{pageId} {
+      allow read: if isActive();
+      allow create, update, delete: if isOwner();
+    }
   }
 }

@@ -39,7 +39,8 @@ company-sales-hub/
 - Daily reports by manager with delete option
 - Owner dashboard, Admin Panel, and KPI Dashboard
 - Searchable Sales Playbook in English and Russian
-- Message templates with copy buttons
+- Owner-editable Sales Playbook and prompts/templates saved in Firestore
+- Message templates/prompts with copy buttons
 - CSV backup/export for leads, reports, follow-ups, and checklists
 - Mobile-friendly responsive layout
 - Collapsible grouped sidebar navigation on desktop and accordion menu navigation on mobile
@@ -90,7 +91,7 @@ This production package already approves these emails:
 
 Add future emails in lowercase to both `app-config.js` and `firestore.rules`.
 
-Important: every approved email must also be listed inside `firestore.rules`.
+Important: every approved email must also be listed inside `firestore.rules`. Because this version adds editable resources, publish the included `firestore.rules` before using owner edits.
 
 ## Security Model
 
@@ -104,6 +105,7 @@ Important: every approved email must also be listed inside `firestore.rules`.
 - Cross-manager availability uses the `bookingSlots` collection, which stores only sanitized busy-slot data: date, time, duration, booking status, character, and ownerId.
 - Managers can see other managers' busy slots in calendars, but not full lead details such as client name, phone, email, address, package, notes, deposit, or balance.
 - Disabled users are blocked by the app and by Firestore rules.
+- `resourcePages` lets approved users read owner-approved resources, while only owner users can create/update/delete playbook and prompts content.
 
 Static GitHub Pages cannot fully prevent someone from creating a Firebase Auth account outside the UI. Firestore Rules are the real protection: unapproved accounts cannot access company data.
 
@@ -230,3 +232,8 @@ Add-ons include additional character, extra 30 minutes, desserts/cake, flowers, 
 - Owner account is registered first.
 - Manager account is tested in a separate browser or private window.
 - CSV export buttons are tested after sample data is added.
+
+
+## Owner Resource Editing
+
+Owners can edit the Sales Playbook and prompts/templates directly inside the app. Open Sales Playbook or Templates, use the Owner editor panel, edit the JSON content, and save. Managers see the saved version as read-only. Use Reset to default to remove the Firestore override and return to the built-in content.

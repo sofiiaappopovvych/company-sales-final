@@ -40,6 +40,9 @@ const state = {
   reports: [],
   checklist: {},
   teamChecklists: [],
+  resourcePages: {},
+  editingPlaybook: false,
+  editingTemplates: false,
   playbookLanguage: "en",
   playbookSearch: "",
   templateSearch: "",
@@ -444,9 +447,17 @@ function bindEvents() {
   $("playbookSearch").addEventListener("input", updatePlaybookSearch);
   $("playbookLanguage").addEventListener("change", updatePlaybookLanguage);
   $("clearPlaybookSearchBtn").addEventListener("click", clearPlaybookSearch);
+  $("editPlaybookBtn").addEventListener("click", startPlaybookEdit);
+  $("savePlaybookBtn").addEventListener("click", savePlaybookContent);
+  $("cancelPlaybookEditBtn").addEventListener("click", cancelPlaybookEdit);
+  $("resetPlaybookBtn").addEventListener("click", resetPlaybookContent);
   $("templateSearch").addEventListener("input", updateTemplateFilters);
   $("templateCategory").addEventListener("change", updateTemplateFilters);
   $("clearTemplateSearchBtn").addEventListener("click", clearTemplateFilters);
+  $("editTemplatesBtn").addEventListener("click", startTemplatesEdit);
+  $("saveTemplatesBtn").addEventListener("click", saveTemplatesContent);
+  $("cancelTemplatesEditBtn").addEventListener("click", cancelTemplatesEdit);
+  $("resetTemplatesBtn").addEventListener("click", resetTemplatesContent);
   els.followUpForm.addEventListener("submit", saveFollowUp);
   $("clearFollowUpBtn").addEventListener("click", clearFollowUpForm);
   els.reportForm.addEventListener("submit", saveReport);
@@ -455,10 +466,18 @@ function bindEvents() {
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => showSection(button.dataset.section));
   });
+  setupResponsiveNavigation();
+  window.addEventListener("resize", setupResponsiveNavigation);
 
   $("reportDate").value = today();
   $("followUpDate").value = today();
   $("availabilityDate").value = today();
+}
+
+function setupResponsiveNavigation() {
+  const navMenu = document.querySelector(".nav-menu");
+  if (!navMenu) return;
+  navMenu.open = !window.matchMedia("(max-width: 860px)").matches;
 }
 
 function setAuthMode(mode) {
@@ -574,14 +593,15 @@ async function loadData() {
   try {
     await withLoading("Syncing latest data...", async () => {
       const scopeField = isOwner() ? null : where("ownerId", "==", state.user.uid);
-      const [users, leads, calendarLeads, bookingSlots, followUps, reports, teamChecklists] = await Promise.all([
+      const [users, leads, calendarLeads, bookingSlots, followUps, reports, teamChecklists, resourcePages] = await Promise.all([
         isOwner() ? getDocs(collection(db, "users")) : Promise.resolve({ docs: [] }),
         getDocs(buildScopedQuery("leads", scopeField)),
         isOwner() ? getDocs(query(collection(db, "leads"))) : Promise.resolve({ docs: [] }),
         getDocs(query(collection(db, "bookingSlots"))),
         getDocs(buildScopedQuery("followUps", scopeField)),
         getDocs(buildScopedQuery("dailyReports", scopeField)),
-        isOwner() ? getDocs(query(collection(db, "dailyChecklists"), where("date", "==", today()))) : Promise.resolve({ docs: [] })
+        isOwner() ? getDocs(query(collection(db, "dailyChecklists"), where("date", "==", today()))) : Promise.resolve({ docs: [] }),
+        getDocs(query(collection(db, "resourcePages")))
       ]);
 
       state.users = users.docs.map(toRecord);
@@ -591,6 +611,7 @@ async function loadData() {
       state.followUps = followUps.docs.map(toRecord).sort(sortBy("dueDate", "asc"));
       state.reports = reports.docs.map(toRecord).sort(sortBy("date", "desc"));
       state.teamChecklists = teamChecklists.docs.map(toRecord);
+      state.resourcePages = Object.fromEntries(resourcePages.docs.map((snap) => [snap.id, snap.data()]));
 
       if (isOwner()) await syncBookingSlots();
       await loadChecklist();
@@ -696,6 +717,7 @@ async function loadChecklist() {
 }
 
 function renderAll() {
+  setOwnerEditorVisibility();
   renderStats();
   renderKpiDashboard();
   renderCalendar();
@@ -1523,6 +1545,152 @@ function clearLeadFilters() {
   updateLeadFilters();
 }
 
+
+function getPlaybookDocId(language = state.playbookLanguage) {
+  return `playbook_${language}`;
+}
+
+function getPlaybookSections(language = state.playbookLanguage) {
+  const fallback = PLAYBOOK_CONTENT[language] || PLAYBOOK_CONTENT.en;
+  const saved = state.resourcePages[getPlaybookDocId(language)]?.content;
+  return Array.isArray(saved) && saved.length ? saved : fallback;
+}
+
+function getTemplateLibrary() {
+  const saved = state.resourcePages.templates?.content;
+  return Array.isArray(saved) && saved.length ? saved : TEMPLATE_LIBRARY;
+}
+
+function isValidPlaybookContent(content) {
+  return Array.isArray(content) && content.every((section) => {
+    return typeof section?.title === "string" && Array.isArray(section.points) && section.points.every((point) => typeof point === "string");
+  });
+}
+
+function isValidTemplateContent(content) {
+  return Array.isArray(content) && content.every((template) => {
+    return typeof template?.category === "string" && typeof template.title === "string" && typeof template.text === "string";
+  });
+}
+
+function setOwnerEditorVisibility() {
+  $("playbookOwnerTools").classList.toggle("hidden", !isOwner());
+  $("templatesOwnerTools").classList.toggle("hidden", !isOwner());
+}
+
+function setPlaybookEditMode(active) {
+  state.editingPlaybook = active;
+  $("playbookEditor").classList.toggle("hidden", !active);
+  $("savePlaybookBtn").classList.toggle("hidden", !active);
+  $("cancelPlaybookEditBtn").classList.toggle("hidden", !active);
+  $("resetPlaybookBtn").classList.toggle("hidden", !active);
+  $("editPlaybookBtn").classList.toggle("hidden", active);
+}
+
+function setTemplatesEditMode(active) {
+  state.editingTemplates = active;
+  $("templatesEditor").classList.toggle("hidden", !active);
+  $("saveTemplatesBtn").classList.toggle("hidden", !active);
+  $("cancelTemplatesEditBtn").classList.toggle("hidden", !active);
+  $("resetTemplatesBtn").classList.toggle("hidden", !active);
+  $("editTemplatesBtn").classList.toggle("hidden", active);
+}
+
+function startPlaybookEdit() {
+  if (!isOwner()) return;
+  $("playbookEditor").value = JSON.stringify(getPlaybookSections(), null, 2);
+  setMessage($("playbookEditMessage"), "Edit JSON, then save. Structure: title + points array.");
+  setPlaybookEditMode(true);
+}
+
+async function savePlaybookContent() {
+  if (!isOwner()) return;
+  try {
+    const content = JSON.parse($("playbookEditor").value);
+    if (!isValidPlaybookContent(content)) throw new Error("Invalid playbook format. Each section needs title and points array.");
+    await setDoc(doc(db, "resourcePages", getPlaybookDocId()), {
+      page: "playbook",
+      language: state.playbookLanguage,
+      content,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user.uid,
+      updatedByEmail: state.user.email
+    }, { merge: true });
+    state.resourcePages[getPlaybookDocId()] = { content, page: "playbook", language: state.playbookLanguage };
+    setPlaybookEditMode(false);
+    setMessage($("playbookEditMessage"), "Playbook saved.");
+    renderPlaybook();
+  } catch (error) {
+    setMessage($("playbookEditMessage"), cleanError(error), true);
+  }
+}
+
+function cancelPlaybookEdit() {
+  setPlaybookEditMode(false);
+  setMessage($("playbookEditMessage"), "Edit cancelled.");
+}
+
+async function resetPlaybookContent() {
+  if (!isOwner()) return;
+  if (!confirm("Reset this playbook language to the default content?")) return;
+  try {
+    await deleteDoc(doc(db, "resourcePages", getPlaybookDocId()));
+    delete state.resourcePages[getPlaybookDocId()];
+    setPlaybookEditMode(false);
+    setMessage($("playbookEditMessage"), "Playbook reset to default.");
+    renderPlaybook();
+  } catch (error) {
+    setMessage($("playbookEditMessage"), cleanError(error), true);
+  }
+}
+
+function startTemplatesEdit() {
+  if (!isOwner()) return;
+  $("templatesEditor").value = JSON.stringify(getTemplateLibrary(), null, 2);
+  setMessage($("templatesEditMessage"), "Edit JSON, then save. Structure: category + title + text.");
+  setTemplatesEditMode(true);
+}
+
+async function saveTemplatesContent() {
+  if (!isOwner()) return;
+  try {
+    const content = JSON.parse($("templatesEditor").value);
+    if (!isValidTemplateContent(content)) throw new Error("Invalid prompts format. Each item needs category, title, and text.");
+    await setDoc(doc(db, "resourcePages", "templates"), {
+      page: "templates",
+      content,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user.uid,
+      updatedByEmail: state.user.email
+    }, { merge: true });
+    state.resourcePages.templates = { content, page: "templates" };
+    setTemplatesEditMode(false);
+    setMessage($("templatesEditMessage"), "Prompts saved.");
+    renderTemplates();
+  } catch (error) {
+    setMessage($("templatesEditMessage"), cleanError(error), true);
+  }
+}
+
+function cancelTemplatesEdit() {
+  setTemplatesEditMode(false);
+  setMessage($("templatesEditMessage"), "Edit cancelled.");
+}
+
+async function resetTemplatesContent() {
+  if (!isOwner()) return;
+  if (!confirm("Reset prompts/templates to the default content?")) return;
+  try {
+    await deleteDoc(doc(db, "resourcePages", "templates"));
+    delete state.resourcePages.templates;
+    setTemplatesEditMode(false);
+    setMessage($("templatesEditMessage"), "Prompts reset to default.");
+    renderTemplates();
+  } catch (error) {
+    setMessage($("templatesEditMessage"), cleanError(error), true);
+  }
+}
+
 function updatePlaybookSearch() {
   state.playbookSearch = $("playbookSearch").value.trim().toLowerCase();
   renderPlaybook();
@@ -1530,6 +1698,7 @@ function updatePlaybookSearch() {
 
 function updatePlaybookLanguage() {
   state.playbookLanguage = $("playbookLanguage").value;
+  if (state.editingPlaybook) $("playbookEditor").value = JSON.stringify(getPlaybookSections(), null, 2);
   renderPlaybook();
 }
 
@@ -1540,7 +1709,7 @@ function clearPlaybookSearch() {
 }
 
 function renderPlaybook() {
-  const sections = PLAYBOOK_CONTENT[state.playbookLanguage] || PLAYBOOK_CONTENT.en;
+  const sections = getPlaybookSections();
   const filtered = sections.filter((section) => {
     const text = [section.title, ...section.points].join(" ").toLowerCase();
     return !state.playbookSearch || text.includes(state.playbookSearch);
@@ -1577,7 +1746,7 @@ function clearTemplateFilters() {
 }
 
 function renderTemplates() {
-  const filtered = TEMPLATE_LIBRARY.filter((template) => {
+  const filtered = getTemplateLibrary().filter((template) => {
     const text = [template.category, template.title, template.text].join(" ").toLowerCase();
     if (state.templateCategory && template.category !== state.templateCategory) return false;
     if (state.templateSearch && !text.includes(state.templateSearch)) return false;
@@ -1616,7 +1785,7 @@ async function copyTemplateText(index) {
 }
 
 function getFilteredTemplates() {
-  return TEMPLATE_LIBRARY.filter((template) => {
+  return getTemplateLibrary().filter((template) => {
     const text = [template.category, template.title, template.text].join(" ").toLowerCase();
     if (state.templateCategory && template.category !== state.templateCategory) return false;
     if (state.templateSearch && !text.includes(state.templateSearch)) return false;

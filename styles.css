@@ -1074,6 +1074,10 @@ main {
     top: 0;
     z-index: 4;
     min-height: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-right: 0;
     border-bottom: 1px solid var(--line);
     padding: 10px clamp(16px, 3vw, 32px);
@@ -1081,6 +1085,11 @@ main {
 
   .nav-menu {
     gap: 12px;
+    max-height: calc(100dvh - 20px);
+    overflow-y: auto;
+    padding-bottom: 10px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav-menu > summary {
@@ -1213,5 +1222,48 @@ main {
 
   .character-day {
     min-height: auto;
+  }
+}
+
+.owner-editor {
+  border-style: dashed;
+}
+
+.resource-editor {
+  width: 100%;
+  min-height: 320px;
+  margin-top: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+button.danger {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+@media (max-width: 760px) {
+  .row-actions {
+    justify-content: stretch;
+  }
+
+  .row-actions button {
+    flex: 1 1 140px;
+  }
+
+  .resource-editor {
+    min-height: 55vh;
+    font-size: 0.82rem;
   }
 }

@@ -143,6 +143,17 @@
 - Owner/Admin links appear only for owner users.
 - Active section is highlighted.
 
+## Owner Resource Editing
+
+- Owner sees Owner editor on Sales Playbook.
+- Owner can edit and save the selected playbook language.
+- Owner can reset playbook content to default.
+- Owner sees Owner editor on Templates/Prompts.
+- Owner can edit and save prompts/templates.
+- Manager does not see editor controls.
+- Manager sees saved playbook and prompts content as read-only after refresh.
+- Invalid JSON shows an error and does not overwrite saved content.
+
 ## Deployment
 
 - GitHub Pages URL opens the app.

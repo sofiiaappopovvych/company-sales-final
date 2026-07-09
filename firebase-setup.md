@@ -69,3 +69,8 @@ The rules protect full CRM leads and allow managers to read only sanitized `book
 3. Register with `skillfulsweing@gmail.com` or `sales@funandjoy.io`.
 4. The app automatically creates the owner profile.
 5. After owner login, the app syncs sanitized booking slots for existing booked/tentative/completed leads.
+
+
+## Editable Resources
+
+This version uses a `resourcePages` collection for owner-edited Sales Playbook and prompts/templates. Approved users can read these pages. Only owner users can create, update, or delete them. Publish the included `firestore.rules` after uploading this ZIP.

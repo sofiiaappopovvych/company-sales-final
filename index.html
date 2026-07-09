@@ -91,7 +91,7 @@
                 <summary>Resources</summary>
                 <div class="nav-group">
                 <button class="nav-btn" data-section="playbookSection" type="button">Sales Playbook</button>
-                <button class="nav-btn" data-section="templatesSection" type="button">Templates</button>
+                <button class="nav-btn" data-section="templatesSection" type="button">Prompts / Templates</button>
                 </div>
               </details>
               <details class="nav-section owner-nav-group" open>
@@ -723,6 +723,22 @@
               </label>
               <button id="clearPlaybookSearchBtn" class="secondary" type="button">Clear search</button>
             </article>
+            <article id="playbookOwnerTools" class="panel owner-editor hidden">
+              <div class="panel-heading">
+                <div>
+                  <h3>Owner editor</h3>
+                  <p class="muted">Edit the selected playbook language. Managers will see the saved version as read-only.</p>
+                </div>
+                <div class="row-actions">
+                  <button id="editPlaybookBtn" class="secondary" type="button">Edit playbook</button>
+                  <button id="savePlaybookBtn" class="primary hidden" type="button">Save</button>
+                  <button id="cancelPlaybookEditBtn" class="secondary hidden" type="button">Cancel</button>
+                  <button id="resetPlaybookBtn" class="danger hidden" type="button">Reset to default</button>
+                </div>
+              </div>
+              <textarea id="playbookEditor" class="resource-editor hidden" rows="16" spellcheck="false"></textarea>
+              <p id="playbookEditMessage" class="message"></p>
+            </article>
             <div id="playbookList" class="playbook-list"></div>
           </section>
 
@@ -730,12 +746,12 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Message library</p>
-                <h2>Templates</h2>
+                <h2>Prompts / Templates</h2>
               </div>
             </div>
             <article class="panel template-tools">
               <label class="search-field">
-                Search templates
+                Search prompts
                 <input id="templateSearch" type="search" placeholder="Search by category, channel, wording..." />
               </label>
               <label>
@@ -753,6 +769,22 @@
                 </select>
               </label>
               <button id="clearTemplateSearchBtn" class="secondary" type="button">Clear search</button>
+            </article>
+            <article id="templatesOwnerTools" class="panel owner-editor hidden">
+              <div class="panel-heading">
+                <div>
+                  <h3>Owner editor</h3>
+                  <p class="muted">Edit prompts/templates. Managers will see the saved version as read-only.</p>
+                </div>
+                <div class="row-actions">
+                  <button id="editTemplatesBtn" class="secondary" type="button">Edit prompts</button>
+                  <button id="saveTemplatesBtn" class="primary hidden" type="button">Save</button>
+                  <button id="cancelTemplatesEditBtn" class="secondary hidden" type="button">Cancel</button>
+                  <button id="resetTemplatesBtn" class="danger hidden" type="button">Reset to default</button>
+                </div>
+              </div>
+              <textarea id="templatesEditor" class="resource-editor hidden" rows="16" spellcheck="false"></textarea>
+              <p id="templatesEditMessage" class="message"></p>
             </article>
             <p id="templateCopyMessage" class="message"></p>
             <div id="templatesList" class="templates-list"></div>
