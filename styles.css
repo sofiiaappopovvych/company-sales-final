@@ -1268,32 +1268,85 @@ button.danger {
   }
 }
 
-html,
+/* FINAL MOBILE WIDTH / OVERFLOW FIX */
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
   margin: 0;
 }
 
-.app,
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+#authView,
+#appView,
 .auth-shell,
-.main,
-.page,
-.section,
-.container,
-.card,
-.form-card,
-.admin-card,
-.kpi-card,
-.crm-card {
+.auth-card,
+.topbar,
+.app-shell,
+.main-nav,
+.nav-menu,
+.nav-section,
+.nav-group,
+main,
+.page-section,
+.section-heading,
+.panel,
+.stat-card,
+.record-card,
+.form-grid,
+.form-grid > *,
+.lead-filters,
+.lead-filters > *,
+.daily-goals,
+.daily-goals > *,
+.checklist,
+.checklist > *,
+.two-column,
+.two-column > *,
+.stats-grid,
+.stats-grid > *,
+.kpi-grid,
+.kpi-grid > *,
+.kpi-period-grid,
+.kpi-period-grid > *,
+.admin-action-grid,
+.admin-action-grid > *,
+.playbook-tools,
+.playbook-tools > *,
+.template-tools,
+.template-tools > *,
+.queue-action-grid,
+.queue-action-grid > *,
+.availability-filters,
+.availability-filters > *,
+.availability-summary,
+.availability-summary > *,
+.booking-calendar,
+.calendar-day,
+.character-week,
+.character-day {
   max-width: 100%;
   min-width: 0;
 }
@@ -1307,103 +1360,223 @@ button {
   font-size: 16px;
 }
 
-.form-grid,
-.grid,
-.stats-grid,
-.kpi-grid,
-.admin-grid,
-.owner-grid,
-.report-grid {
-  max-width: 100%;
-  min-width: 0;
+input,
+select,
+textarea {
+  display: block;
+  width: 100%;
 }
 
-@media (max-width: 768px) {
+input,
+textarea,
+.record-title,
+.record-meta,
+.record-card,
+.panel,
+.template-card pre,
+.playbook-card,
+.calendar-event,
+.availability-booking {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+input {
+  text-overflow: ellipsis;
+}
+
+textarea {
+  resize: vertical;
+}
+
+@media (max-width: 860px) {
+  html,
   body {
+    width: 100%;
+    max-width: 100%;
     overflow-x: hidden;
   }
 
-  .app-header {
+  .topbar {
+    position: static;
     width: 100%;
     max-width: 100%;
     padding: 24px 16px;
   }
 
-  .app-header h1 {
+  .topbar h1 {
     font-size: 32px;
     line-height: 1.1;
-    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
-  .header-row,
-  .topbar,
+  .user-box {
+    width: 100%;
+    max-width: 100%;
+    justify-content: space-between;
+  }
+
   .app-shell {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .nav,
-  .tabs,
-  .desktop-nav {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .nav button,
-  .tabs button {
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
-  .mobile-menu,
-  .menu-panel {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .content,
-  main {
-    width: 100%;
-    max-width: 100%;
-    padding: 16px;
-    overflow-x: hidden;
-  }
-
-  .form-card,
-  .card {
-    width: 100%;
-    max-width: 100%;
-    padding: 16px;
-  }
-
-  .form-grid,
-  .stats-grid,
-  .kpi-grid,
-  .admin-grid,
-  .owner-grid,
-  .report-grid {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+    max-width: 100%;
   }
 
-  label,
-  .field,
-  .form-field {
+  .main-nav {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 16px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-menu {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .nav-menu > summary {
     width: 100%;
     max-width: 100%;
   }
 
-  input,
-  select,
-  textarea {
+  main {
     width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 20px 16px 56px;
+    overflow-x: hidden;
+  }
+
+  .page-section {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .panel,
+  .stat-card,
+  .record-card {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 16px;
+  }
+
+  .stats-grid,
+  .two-column,
+  .form-grid,
+  .lead-filters,
+  .daily-goals,
+  .queue-action-grid,
+  .playbook-tools,
+  .playbook-list,
+  .template-tools,
+  .templates-list,
+  .admin-action-grid,
+  .kpi-grid,
+  .kpi-period-grid,
+  .checklist,
+  .availability-filters,
+  .availability-summary {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    width: 100%;
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  label {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .full {
+    grid-column: 1 / -1;
+  }
+
+  .form-actions,
+  .record-actions,
+  .export-actions,
+  .row-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .form-actions button,
+  .record-actions button,
+  .export-actions button,
+  .row-actions button {
+    width: 100%;
+  }
+
+  .calendar-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .calendar-weekdays {
+    display: none;
+  }
+
+  .booking-calendar {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    width: 100%;
+    max-width: 100%;
+    border: 0;
+    gap: 10px;
+  }
+
+  .calendar-day {
+    width: 100%;
+    max-width: 100%;
+    min-height: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .calendar-day.muted-day {
+    display: none;
+  }
+
+  .character-week {
+    grid-template-columns: 1fr !important;
+  }
+
+  .character-day {
+    min-height: auto;
   }
 
   select[multiple] {
     min-height: 140px;
+  }
+
+  .resource-editor {
+    width: 100%;
+    max-width: 100%;
+    min-height: 55vh;
+    overflow: auto;
+    font-size: 0.82rem;
   }
 }
